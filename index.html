@@ -422,6 +422,13 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 #rtchart { width: 100%; height: clamp(380px, 56vh, 560px); }
 @media (max-width: 560px) { #rtchart { height: 420px; } .rt-d-head .big { font-size: 22px; } }
 
+.rt-day { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.rt-day input[type="date"] { font: inherit; font-size: 14px; padding: 5px 9px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); color-scheme: light dark; }
+.rt-day .ghost { padding: 5px 10px; }
+.band-btn { font-size: 13px; font-weight: 600; padding: 5px 12px 5px 10px; }
+.band-btn i { width: 12px; height: 12px; border-radius: 3px; }
+.legend i.bar { width: 14px; height: 10px; border-radius: 2px; }
+
 </style>
 
 <header class="appbar">
@@ -476,6 +483,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       </div>
       <div class="rt-d-head" id="rt-d-head"></div>
       <div class="rt-d-checks" id="rt-d-checks"></div>
+      <div class="marks"><button type="button" class="mk band-btn" id="rt-band" aria-pressed="true" style="--c: var(--up)"><i></i>符合 / 不符合区间</button><span class="cap">红色底色是这只股票当天符合选股条件，绿色底色是不符合。</span></div>
       <div class="hover" id="rt-d-hover"></div>
       <div class="chart-box"><div id="rtchart"></div></div>
       <div class="legend" id="rt-d-legend"></div>
@@ -484,6 +492,14 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     <section class="card" aria-labelledby="rt-s-title">
       <div class="card-head"><h2 id="rt-s-title" class="h-card">今天符合条件的个股</h2><span class="pl-stats" id="rt-s-stats"></span></div>
       <p class="rt-gate" id="rt-gate"></p>
+      <div class="rt-day">
+        <span class="seg-label">日期</span>
+        <button type="button" class="ghost" id="rt-day-prev" aria-label="前一个交易日">◀</button>
+        <input type="date" id="rt-day" aria-label="选择日期">
+        <button type="button" class="ghost" id="rt-day-next" aria-label="后一个交易日">▶</button>
+        <button type="button" class="ghost" id="rt-day-today">回到今天</button>
+        <span class="cap" id="rt-day-note"></span>
+      </div>
       <div class="rt-filter">
         <span class="seg" id="rt-s-mode" role="group" aria-label="显示范围">
           <button type="button" data-m="ok" aria-pressed="true">符合条件</button>
@@ -547,7 +563,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
         </span></div>
         <span class="bar-r"><span class="seg" id="ds-range" role="group" aria-label="显示区间"></span><button type="button" class="ghost" id="ds-hbtn" aria-expanded="false" aria-controls="ds-hpanel">调高度</button></span>
       </div>
-      <div class="marks" role="group" aria-label="图上标记"><span class="seg-label">标记</span><button type="button" class="mk" id="ds-mk" style="--c: var(--up)" aria-pressed="true"><i></i>三线站上 / 跌破</button></div>
+      <div class="marks" role="group" aria-label="图上标记"><span class="seg-label">标记</span><button type="button" class="mk band-btn" id="ds-band" style="--c: var(--up)" aria-pressed="true"><i></i>大势符合 / 不符合区间</button><button type="button" class="mk" id="ds-mk" style="--c: var(--up)" aria-pressed="true"><i></i>三线站上 / 跌破</button><span class="cap" id="ds-band-cap">红色底色：三条线都在 10 日线上方，大势符合；绿色底色：不符合。只在日K显示。</span></div>
       <div class="hover" id="ds-hover"></div>
       <div class="hpanel" id="ds-hpanel" hidden></div>
       <div class="chart-box"><div id="dschart"></div><div class="plabels" id="ds-plabels" aria-hidden="true"></div></div>
@@ -927,7 +943,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const n = b.length, C = b.map(x => x.c), V = b.map(x => x.v), H = b.map(x => x.h);
     const ma = k => { const out = new Array(n).fill(NaN); let s = 0; for (let i = 0; i < n; i++) { s += C[i]; if (i >= k) s -= C[i - k]; if (i >= k - 1) out[i] = s / k; } return out; };
     const m5 = ma(5), m10 = ma(10), m20 = ma(20);
-    const v5 = new Array(n).fill(NaN); { let s = 0; for (let i = 0; i < n; i++) { s += V[i]; if (i >= 5) s -= V[i - 5]; if (i >= 4) v5[i] = s / 5; } }
+    const v5 = new Array(n).fill(NaN); for (let i = 4; i < n; i++) v5[i] = (V[i] + V[i - 1] + V[i - 2] + V[i - 3] + V[i - 4]) / 5;
     const vmax = new Array(n).fill(NaN); { let m = -Infinity; for (let i = 0; i < n; i++) { if (ok(v5[i])) m = Math.max(m, v5[i]); vmax[i] = m; } }
     return { n, C, V, H, m5, m10, m20, v5, vmax };
   }
@@ -956,7 +972,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       newHigh: c > c60p
     };
     const nearHigh = c >= 0.97 * hi60;
-    const extreme = ok(v5[i]) && v5[i] >= vmax[i] * 0.999 && i >= 120;
+    const extreme = ok(v5[i]) && v5[i] >= vmax[i] * 0.999 && (i >= 120 || P.vmLong);
     const anyTrig = trig.reclaim || trig.pull5 || trig.pull10 || trig.newHigh;
     const fails = Object.values(must).filter(x => !x).length + (nearHigh || anyTrig ? 0 : 1);
     // sell / warning signals
@@ -1041,7 +1057,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     gate();
   }
   function gate() {
-    const m = S.mkt, g = $('rt-gate'); if (!m) return;
+    const m = S.mkt, g = $('rt-gate'); if (!m || S.histDay) return;
     if (!m.dsOk) { g.className = 'rt-gate no'; g.textContent = '大势不符合：原规则是择时条件不符合就别选股。下面只当观察，不是买点。'; }
     else if (m.lv === 0) { g.className = 'rt-gate no'; g.textContent = '大势符合，但两市成交额不到 2 万亿：原规则是 2 万亿以下休息。下面只当观察。'; }
     else if (m.lv === 1) { g.className = 'rt-gate part'; g.textContent = '大势符合，成交额在 2 万亿到 2.5 万亿：只算局部机会，不重仓。'; }
@@ -1049,6 +1065,43 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   }
 
   // ---------- screening ----------
+  // ---------- daily base file (built after each close by the site's scheduled job) ----------
+  let baseP = null, baseDay = '';
+  function loadBase() {
+    const day = bj().date + '-' + (bj().min >= 1170 ? 'b' : 'a');   // re-read after 19:30, when the new file is out
+    if (baseP && baseDay === day) return baseP;
+    baseDay = day;
+    baseP = fetch('base.json?d=' + day, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('基准文件 ' + r.status); return r.json(); }).catch(e => { baseP = null; throw e; });
+    return baseP;
+  }
+  // history bars from the base file, plus the live bar when it is a newer day
+  function baseBars(B, id, live) {
+    const rec = B.s[id]; if (!rec) return null;
+    const n = rec.c.length, dates = rec.d && rec.d.length === n ? rec.d : B.dates.slice(-n);
+    const od = rec.d && rec.d.length !== n ? rec.d : null;
+    const bars = []; let c = 0;
+    for (let j = 0; j < n; j++) {
+      c += rec.c[j];
+      const oi = j - (n - rec.o.length), vi = j - (n - rec.v.length);
+      bars.push({ t: dates[j], c: c / 100, h: (c + rec.h[j]) / 100, o: oi >= 0 ? (c + rec.o[oi]) / 100 : c / 100, l: j === n - 1 ? rec.l / 100 : NaN, v: vi >= 0 ? rec.v[vi] : NaN, a: NaN });
+    }
+    if (od) od.forEach((t, k) => { bars[n - od.length + k].t = t; });
+    const last = bars[n - 1];
+    if (live && isFinite(live.c) && live.c > 0 && isFinite(live.v) && live.v > 0) {
+      const same = Math.abs(live.c - last.c) < 0.006 && Math.abs(live.v - last.v) / last.v < 0.03;
+      if (same) Object.assign(last, { a: live.a });
+      else if (session() !== 'pre' || bj().date > last.t) bars.push({ t: live.t && live.t > last.t ? live.t : (bj().date > last.t ? bj().date : last.t + '+'), o: live.o, h: live.h, l: live.l, c: live.c, v: live.v, a: live.a });
+    }
+    return { bars, vm: rec.m, name: rec.n };
+  }
+  function evalBase(B, id, live, code, name) {
+    const x = baseBars(B, id, live); if (!x) return null;
+    const P = prep(x.bars), i = x.bars.length - 1;
+    P.vmax[i] = Math.max(x.vm, ok(P.v5[i]) ? P.v5[i] : 0); P.vmLong = true;
+    const r = evalAt(x.bars, P, i, code, name || x.name);
+    if (r) r.liveBar = x.bars.length > B.s[id].c.length;
+    return r;
+  }
   async function loadScan() {
     const pages = [];
     for (const p of [1, 2]) { try { pages.push(await emTop(p)); } catch (e) { if (p === 1) throw new Error('成交额排行没拉到'); } }
@@ -1056,12 +1109,23 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const seen = new Set(), list = [];
     rows.forEach(r => { const id = r.f13 + '.' + r.f12; if (!seen.has(id)) { seen.add(id); patch(id, fromEM(r)); list.push({ id, code: r.f12, name: r.f14, amt: r.f6, turn: r.f8, flt: r.f21 }); } });
     if (!list.length) throw new Error('候选池为空');
-    const res = await pool(list, 4, async st => {
-      const k = await emKline(st.id, 500);
-      if (k.bars.length < 61) return null;
-      const P = prep(k.bars), r = evalAt(k.bars, P, k.bars.length - 1, st.code, st.name);
-      return r && Object.assign(r, st);
-    });
+    let B = null; try { B = await loadBase(); } catch (e) { S.baseErr = e.message; }
+    let res;
+    if (B) {
+      S.baseDate = B.d;
+      const live = new Map(rows.map(r => [r.f13 + '.' + r.f12, fromEM(r)]));
+      res = list.map(st => { const r = evalBase(B, st.id, live.get(st.id), st.code, st.name); return r && Object.assign(r, st); });
+      S.scanMissing = res.filter(x => !x).length;
+    } else {
+      // no base file yet: fall back to per-stock history, but only for the top 40 to stay gentle on the data sources
+      res = await pool(list.slice(0, 40), 2, async st => {
+        const k = await emKline(st.id, 500);
+        if (k.bars.length < 61) return null;
+        const P = prep(k.bars), r = evalAt(k.bars, P, k.bars.length - 1, st.code, st.name);
+        return r && Object.assign(r, st);
+      });
+      S.scanMissing = list.length - 40;
+    }
     const out = res.filter(Boolean);
     const byRet = out.slice().sort((a, b) => b.ret20 - a.ret20); byRet.forEach((r, k) => { r.rank20 = k + 1; });
     out.forEach(r => { r.bonus = (r.extreme ? 1 : 0) + (r.rank20 <= 50 ? 1 : 0); });
@@ -1073,8 +1137,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const sig = opts && opts.sig;
     if (sig) d.classList.add(r.sell.length ? 'sell' : r.warn.length ? 'warn' : 'okk'); else if (r.pass) d.classList.add('okk');
     d.tabIndex = 0; d.setAttribute('role', 'button'); d.setAttribute('aria-label', '查看 ' + r.name);
-    let h = '<div class="sk-top"><span class="sk-name">' + r.name + '<small>' + r.code + '</small></span><span class="sk-px ' + cls(r.chg) + '">' + px(r.c) + '<small>' + pct(r.chg) + '</small></span></div>';
-    h += '<div class="sk-meta">' + (r.amt ? '<span>成交 <b>' + yi(r.amt) + '</b></span>' : '') + (ok(r.turn) ? '<span>换手 <b>' + r.turn.toFixed(1) + '%</b></span>' : '') + '<span>离5日线 <b class="' + cls(r.bias) + '">' + pct(r.bias, 1) + '</b></span><span>量比5/20 <b>' + (ok(r.volx) ? r.volx.toFixed(2) : '—') + '</b></span></div>';
+    let h = '<div class="sk-top"><span class="sk-name">' + r.name + '<small>' + r.code + '</small></span><span class="sk-px ' + cls(r.chg) + '">' + (r.hist ? '' : px(r.c)) + '<small>' + pct(r.chg) + '</small></span></div>';
+    h += '<div class="sk-meta">' + (r.amt ? '<span>成交 <b>' + yi(r.amt) + '</b></span>' : '') + (ok(r.turn) ? '<span>换手 <b>' + r.turn.toFixed(1) + '%</b></span>' : '') + (ok(r.bias) ? '<span>离5日线 <b class="' + cls(r.bias) + '">' + pct(r.bias, 1) + '</b></span>' : '') + (ok(r.volx) ? '<span>量比5/20 <b>' + r.volx.toFixed(2) + '</b></span>' : '') + '</div>';
     if (sig) {
       const s = r.sell.length ? chip('sg-chip sell', r.live ? '盘中' + r.sell[0] : '卖出：' + r.sell[0]) : '';
       const w = r.warn.map(x => chip('sg-chip warn', x)).join('');
@@ -1089,30 +1153,119 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     h += '<div class="sk-row"><span class="cap">' + (sig ? (r.t || '') : '') + '</span><button type="button" class="star' + (inWatch(r.id) ? ' on' : '') + '">' + (inWatch(r.id) ? '★ 已自选' : '☆ 加自选') + '</button></div>';
     d.innerHTML = h;
     d.querySelector('.star').addEventListener('click', e => { e.stopPropagation(); toggleWatch(r); });
-    const open = () => openDetail({ id: r.id, code: r.code, name: r.name });
+    const open = () => openDetail({ id: r.id, code: r.code, name: r.name }, r.hist ? r.day : null);
     d.addEventListener('click', open);
     d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
     return d;
   }
   function renderScan() {
+    if (S.histDay) return renderHist();
+    gate();
     const box = $('rt-scan'); box.innerHTML = '';
     const all = S.scan;
     if (!all.length) { box.appendChild(el('div', 'rt-empty', S.scanErr ? '候选池没拉到：' + S.scanErr : '正在扫描成交额前 200 的股票……')); return; }
     const okL = all.filter(r => r.pass).sort((a, b) => b.bonus - a.bonus || b.amt - a.amt);
     const nearL = all.filter(r => r.fails === 1).sort((a, b) => b.amt - a.amt);
     const list = S.mode === 'ok' ? okL : S.mode === 'near' ? nearL : all.slice().sort((a, b) => a.fails - b.fails || b.amt - a.amt);
-    $('rt-s-stats').innerHTML = '<span>候选 <b>' + all.length + '</b></span><span>符合 <b>' + okL.length + '</b></span><span>差一条 <b>' + nearL.length + '</b></span><span>扫描于 <b>' + bjAt(S.scanAt) + '</b></span>';
+    $('rt-s-stats').innerHTML = (S.baseDate ? '<span>历史数据到 <b>' + S.baseDate.slice(5).replace('-', '/') + '</b></span>' : '') + '<span>候选 <b>' + all.length + '</b></span><span>符合 <b>' + okL.length + '</b></span><span>差一条 <b>' + nearL.length + '</b></span><span>扫描于 <b>' + bjAt(S.scanAt) + '</b></span>';
     if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'ok' ? '今天成交额前 200 里没有全部符合条件的股票。' : '没有。')); return; }
     list.slice(0, 120).forEach(r => box.appendChild(stockCard(r)));
     if (list.length > 120) box.appendChild(el('div', 'rt-empty', '只显示前 120 只，其余 ' + (list.length - 120) + ' 只按成交额排在后面。'));
   }
+  // ---------- past days: lists built after each close by the site's scheduled job ----------
+  const HS = { index: null, years: {}, names: null, ths: {} };
+  const jget = path => fetch(path, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('文件 ' + r.status); return r.json(); });
+  function histIndex() { if (!HS.index) HS.index = jget('picks/index.json?d=' + bj().date).catch(e => { HS.index = null; throw e; }); return HS.index; }
+  function histYear(y) { if (!HS.years[y]) HS.years[y] = jget('picks/' + y + '.json?d=' + bj().date).catch(e => { delete HS.years[y]; throw e; }); return HS.years[y]; }
+  function histNames() { if (!HS.names) HS.names = jget('names.json?d=' + bj().date).catch(() => ({})); return HS.names; }
+  function thsYear(code, y) {
+    const k = code + '_' + y;
+    if (!HS.ths[k]) HS.ths[k] = ths('bk_' + code + '/01/' + y + '.js', 'quotebridge_v4_line_bk_' + code + '_01_' + y)
+      .then(d => String((d && d.data) || '').split(';').filter(Boolean).map(r => { const x = r.split(','); return { t: ymd(x[0]), c: +x[4], a: +x[6] }; }))
+      .catch(() => []);
+    return HS.ths[k];
+  }
+  // 大势 on a past day, from 同花顺's yearly index files (全A starts in May 2018)
+  async function dashiAt(day) {
+    const y = +day.slice(0, 4), res = {};
+    for (const [k, code] of LINES) {
+      const bars = (await thsYear(code, y - 1)).concat(await thsYear(code, y));
+      let i = -1; for (let j = bars.length - 1; j >= 0; j--) if (bars[j].t <= day) { i = j; break; }
+      if (i < 9 || bars[i].t !== day) return null;
+      let m = 0; for (let j = i - 9; j <= i; j++) m += bars[j].c; m /= 10;
+      res[k] = { c: bars[i].c, m10: m, above: bars[i].c >= m };
+      if (k === 'A') res.amt = bars[i].a;
+    }
+    res.ok = LINES.every(([k]) => res[k].above); res.lv = amtLevel(res.amt);
+    return res;
+  }
+  const BIT = ['above5', 'up5', 'bias', 'notLimDn', 'heap', 'nearHigh', 'reclaim', 'pull5', 'pull10', 'newHigh', 'extreme'];
+  function histRow(x, names, day) {
+    const [id, chg, amt, turn, fl, rank20, fails] = x, f = {}; BIT.forEach((k, b) => { f[k] = !!(fl & (1 << b)); });
+    return { hist: true, day, id, code: id.slice(2), name: names[id] || id.slice(2), chg: chg / 100, amt: amt * 1e8, turn, rank20, fails, pass: fails === 0,
+      must: { above5: f.above5, up5: f.up5, bias: f.bias, notLimDn: f.notLimDn, heap: f.heap }, nearHigh: f.nearHigh,
+      trig: { reclaim: f.reclaim, pull5: f.pull5, pull10: f.pull10, newHigh: f.newHigh }, extreme: f.extreme, bias: NaN, volx: NaN, sell: [], warn: [] };
+  }
+  async function setHistDay(day, dir) {
+    const note = $('rt-day-note');
+    try {
+      const idx = await histIndex();
+      if (day > idx.last) day = idx.last;
+      if (day < idx.first) day = idx.first;
+      let y = day.slice(0, 4), data = await histYear(y).catch(() => ({})), keys = Object.keys(data).sort();
+      let k = dir > 0 ? keys.find(t => t >= day) : [...keys].reverse().find(t => t <= day);
+      if (!k && dir > 0 && idx.years.includes(String(+y + 1))) { y = String(+y + 1); data = await histYear(y); keys = Object.keys(data).sort(); k = keys[0]; }
+      if (!k && idx.years.includes(String(+y - 1))) { y = String(+y - 1); data = await histYear(y); keys = Object.keys(data).sort(); k = keys[keys.length - 1]; }
+      if (!k) { note.textContent = '这一天没有数据'; return; }
+      S.histDay = k; S.histData = data[k]; S.histKeys = keys; S.histDashi = undefined;
+      $('rt-day').value = k; note.textContent = '正在看 ' + k + ' 收盘后的结果';
+      renderHist();
+      const dd = await dashiAt(k).catch(() => null);
+      if (S.histDay === k) { S.histDashi = dd; renderHist(); }
+    } catch (e) { note.textContent = '历史选股文件还没生成（每天收盘后自动生成），请稍后再试。'; }
+  }
+  async function stepDay(d) {
+    if (!S.histDay) { const idx = await histIndex().catch(() => null); if (!idx) return; return setHistDay(idx.last, -1); }
+    const keys = S.histKeys || [], i = keys.indexOf(S.histDay);
+    if (i + d >= 0 && i + d < keys.length) return setHistDay(keys[i + d], d);
+    const nd = new Date(S.histDay + 'T00:00:00Z'); nd.setUTCDate(nd.getUTCDate() + d * 3);
+    return setHistDay(nd.toISOString().slice(0, 10), d);
+  }
+  async function renderHist() {
+    const box = $('rt-scan'), g = $('rt-gate'), D = S.histDashi, day = S.histDay, data = S.histData;
+    const names = await histNames();
+    if (D === undefined) { g.className = 'rt-gate'; g.textContent = day + '：正在读取当天的大势……'; }
+    else if (D === null) { g.className = 'rt-gate'; g.textContent = day + '：这一天没有大势数据（同花顺全A 从 2018 年 5 月才开始有），下面只看个股条件。'; }
+    else if (!D.ok) { g.className = 'rt-gate no'; g.textContent = day + '：大势不符合（三条线没有都在 10 日线上方），成交额 ' + yi(D.amt) + '。按原规则这天不选股，下面只当观察。'; }
+    else if (D.lv === 0) { g.className = 'rt-gate no'; g.textContent = day + '：大势符合，但成交额 ' + yi(D.amt) + '，不到 2 万亿，按原规则休息。'; }
+    else if (D.lv === 1) { g.className = 'rt-gate part'; g.textContent = day + '：大势符合，成交额 ' + yi(D.amt) + '，只算局部机会。'; }
+    else { g.className = 'rt-gate ok'; g.textContent = day + '：大势符合，成交额 ' + yi(D.amt) + '，按原规则可以选股。'; }
+    const all = data.r.map(x => histRow(x, names, day));
+    const okL = all.filter(r => r.pass).sort((a, b) => b.amt - a.amt), nearL = all.filter(r => !r.pass).sort((a, b) => b.amt - a.amt);
+    const list = S.mode === 'ok' ? okL : S.mode === 'near' ? nearL : okL.concat(nearL);
+    $('rt-s-stats').innerHTML = '<span>日期 <b>' + day + '</b></span><span>候选 <b>' + data.n + '</b></span><span>符合 <b>' + okL.length + '</b></span><span>差一条 <b>' + nearL.length + '</b></span>';
+    box.innerHTML = '';
+    if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'ok' ? '这天成交额前 200 里没有全部符合条件的股票。' : '没有。')); return; }
+    list.slice(0, 120).forEach(r => box.appendChild(stockCard(r)));
+    if (S.mode === 'all') box.appendChild(el('div', 'rt-empty', '历史日期只保存了符合和差一条的股票。'));
+  }
+  $('rt-day').addEventListener('change', () => { const v = $('rt-day').value; if (v) setHistDay(v, -1); });
+  $('rt-day-prev').addEventListener('click', () => stepDay(-1));
+  $('rt-day-next').addEventListener('click', () => stepDay(1));
+  $('rt-day-today').addEventListener('click', () => { S.histDay = null; $('rt-day').value = ''; $('rt-day-note').textContent = '现在看的是今天的实时结果'; renderScan(); });
+  histIndex().then(idx => { $('rt-day').min = idx.first; $('rt-day').max = idx.last; $('rt-day-note').textContent = '可以选 ' + idx.first.slice(0, 4) + ' 年以来的任一交易日'; }).catch(() => { $('rt-day-note').textContent = '历史选股文件还在生成中'; });
   const bjAt = ms => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Shanghai', hourCycle: 'h23', hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(ms));
 
   // ---------- watchlist ----------
   async function refreshWatch() {
     const sess = session(), today = bj().date;
-    try { const snap = await emSnap(S.watch.map(x => x.id).concat(S.detail ? [S.detail.id] : [])); Object.keys(snap).forEach(id => patch(id, snap[id])); } catch (e) {}
-    await pool(S.watch.slice(), 4, async st => {
+    let snap = {}; try { snap = await emSnap(S.watch.map(x => x.id).concat(S.detail ? [S.detail.id] : [])); Object.keys(snap).forEach(id => patch(id, snap[id])); } catch (e) {}
+    let B = null; try { B = await loadBase(); } catch (e) {}
+    await pool(S.watch.slice(), 2, async st => {
+      if (B && B.s[st.id]) {
+        const r = evalBase(B, st.id, snap[st.id], st.code, st.name);
+        if (r) { r.live = (sess === 'open' || sess === 'noon') && r.liveBar; S.wdata[st.id] = Object.assign(r, { id: st.id, code: st.code, name: st.name !== st.code ? st.name : B.s[st.id].n }); return; }
+      }
       const k = await emKline(st.id, 500);
       const P = prep(k.bars), i = k.bars.length - 1, r = evalAt(k.bars, P, i, st.code, k.name || st.name);
       if (!r) { S.wdata[st.id] = { short: true, name: k.name, c: k.bars[i] && k.bars[i].c }; return; }
@@ -1169,7 +1322,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
   // ---------- detail ----------
   const dEl = $('rtchart');
-  let dc = null, dCandle, dM5, dM10, dM20, dVol, dMk;
+  let dc = null, dBand, dCandle, dM5, dM10, dM20, dVol, dMk;
+  S.band = store.get('rt-band') !== '0';
   function makeChart() {
     dc = LWC.createChart(dEl, {
       autoSize: true,
@@ -1182,6 +1336,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       handleScroll: { vertTouchDrag: false }
     });
     const pP = { type: 'price', precision: 2, minMove: 0.01 }, quiet = { priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+    dBand = dc.addSeries(LWC.HistogramSeries, { priceScaleId: 'band', base: 0, priceLineVisible: false, lastValueVisible: false, priceFormat: { type: 'custom', minMove: 1, formatter: () => '' }, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }) }, 0);
+    dBand.priceScale().applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
     dCandle = dc.addSeries(LWC.CandlestickSeries, { priceFormat: pP, priceLineVisible: false }, 0);
     dM5 = dc.addSeries(LWC.LineSeries, Object.assign({ lineWidth: 1, priceFormat: pP }, quiet), 0);
     dM10 = dc.addSeries(LWC.LineSeries, Object.assign({ lineWidth: 2, priceFormat: pP }, quiet), 0);
@@ -1208,7 +1364,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     if (S.detail) drawDetail();
   }
   function renderDetailStar() { const D = S.detail; if (!D) return; $('rt-d-star').textContent = inWatch(D.id) ? '★ 移出自选' : '☆ 加入自选'; }
-  async function openDetail(st) {
+  async function openDetail(st, focus) {
+    S.focus = focus || null;
     const sec = $('rt-detail'); sec.hidden = false;
     $('rt-d-title').textContent = st.name + ' ' + st.code;
     $('rt-d-head').innerHTML = '<span>读取中……</span>'; $('rt-d-checks').innerHTML = '';
@@ -1222,7 +1379,18 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       S.detail = { id: st.id, code: st.code, name: k.name || st.name, bars: k.bars, P, r, idx: new Map(k.bars.map((b, j) => [b.t, j])) };
       $('rt-d-title').textContent = S.detail.name + ' ' + st.code;
       renderDetailStar(); drawDetail(true);
-    } catch (e) { $('rt-d-head').innerHTML = '<span>这只股票的行情没拉到：' + e.message + '</span>'; }
+    } catch (e) {
+      // the history sources refused: draw the last 60 days from the base file instead
+      try {
+        const B = await loadBase(); let snap = {}; try { snap = await emSnap([st.id]); } catch (e2) {}
+        const x = baseBars(B, st.id, snap[st.id]); if (!x) throw e;
+        const P = prep(x.bars), i = x.bars.length - 1; P.vmax[i] = Math.max(x.vm, ok(P.v5[i]) ? P.v5[i] : 0); P.vmLong = true;
+        const r = evalAt(x.bars, P, i, st.code, st.name);
+        S.detail = { id: st.id, code: st.code, name: x.name || st.name, bars: x.bars, P, r, idx: new Map(x.bars.map((b, j) => [b.t, j])), short: true };
+        $('rt-d-title').textContent = S.detail.name + ' ' + st.code + '（最近 60 天）';
+        renderDetailStar(); drawDetail(true);
+      } catch (e3) { $('rt-d-head').innerHTML = '<span>这只股票的行情暂时没拉到（' + e.message + '），稍后再试。</span>'; }
+    }
   }
   function drawDetail(fit) {
     const D = S.detail, b = D.bars, P = D.P, r = D.r, n = b.length;
@@ -1251,10 +1419,24 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       else if (e.trig.newHigh && !(evalAt(b, P, j - 1, D.code, D.name) || {}).trig?.newHigh) mk.push({ time: b[j].t, position: 'belowBar', color: css('--rsrs'), shape: 'circle', text: '新高' });
       if (P.C[j] < P.m5[j] && P.C[j - 1] >= P.m5[j - 1]) mk.push({ time: b[j].t, position: 'aboveBar', color: css('--down'), shape: 'arrowDown', text: '破5日' });
     }
+    // pass / fail spans for the stock's own screening check
+    const pass = b.map((x, j) => { const e = j >= 61 ? evalAt(b, P, j, D.code, D.name) : null; return e ? e.pass : null; });
+    const upc = css('--up'), dnc = css('--down');
+    dBand.applyOptions({ visible: S.band });
+    dBand.setData(b.map((x, j) => pass[j] == null ? { time: x.t } : { time: x.t, value: 1, color: pass[j] ? upc + '3a' : dnc + '24' }));
+    if (S.band) for (let j = 62; j < n; j++) if (pass[j] != null && pass[j] !== pass[j - 1]) mk.push({ time: b[j].t, position: pass[j] ? 'belowBar' : 'aboveBar', color: pass[j] ? upc : dnc, shape: pass[j] ? 'arrowUp' : 'arrowDown', text: pass[j] ? '符合' : '不符合' });
+    if (S.focus && D.idx.has(S.focus)) mk.push({ time: S.focus, position: 'aboveBar', color: css('--accent'), shape: 'square', text: '查看日' });
+    mk.sort((x, y) => (x.time < y.time ? -1 : x.time > y.time ? 1 : 0));
     dMk.setMarkers(mk);
-    $('rt-d-legend').innerHTML = '<span><i style="background:' + css('--ink') + '"></i>MA5</span><span><i style="background:' + css('--accent') + ';height:3px"></i>MA10</span><span><i style="background:' + css('--faint') + '"></i>MA20</span><span>▲上5日：放量站上 5 日线</span><span>●新高：收盘创 60 日新高</span><span>▼破5日：收盘跌破 5 日线</span>';
-    if (fit) { const from = Math.max(0, n - 120); dc.timeScale().setVisibleLogicalRange({ from, to: n + 2 }); }
+    $('rt-band').setAttribute('aria-pressed', String(S.band));
+    $('rt-d-legend').innerHTML = (S.band ? '<span><i class="bar" style="background:' + upc + '55"></i>红色底色：当天符合选股条件</span><span><i class="bar" style="background:' + dnc + '40"></i>绿色底色：不符合</span>' : '') + '<span><i style="background:' + css('--ink') + '"></i>MA5</span><span><i style="background:' + css('--accent') + ';height:3px"></i>MA10</span><span><i style="background:' + css('--faint') + '"></i>MA20</span><span>▲上5日：放量站上 5 日线</span><span>●新高：收盘创 60 日新高</span><span>▼破5日：收盘跌破 5 日线</span>';
+    if (fit) {
+      const fi = S.focus && D.idx.has(S.focus) ? D.idx.get(S.focus) : -1;
+      if (fi >= 0) dc.timeScale().setVisibleLogicalRange({ from: Math.max(0, fi - 80), to: Math.min(n + 2, fi + 40) });
+      else dc.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 120), to: n + 2 });
+    }
   }
+  $('rt-band').addEventListener('click', () => { S.band = !S.band; store.set('rt-band', S.band ? '1' : '0'); if (S.detail) drawDetail(false); else $('rt-band').setAttribute('aria-pressed', String(S.band)); });
   $('rt-d-close').addEventListener('click', () => { $('rt-detail').hidden = true; S.detail = null; });
   $('rt-d-star').addEventListener('click', () => { const D = S.detail; if (D) toggleWatch({ id: D.id, code: D.code, name: D.name }); });
 
@@ -1278,7 +1460,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     S.busy = false;
   }
   async function openDetailQuiet() {
-    const D = S.detail; if (!D) return;
+    const D = S.detail; if (!D || D.short) return;
     const k = await emKline(D.id, 750); const P = prep(k.bars), i = k.bars.length - 1;
     const sess = session(), r = evalAt(k.bars, P, i, D.code, D.name); if (r) r.live = (sess === 'open' || sess === 'noon') && k.bars[i].t === bj().date;
     Object.assign(D, { bars: k.bars, P, r, idx: new Map(k.bars.map((b, j) => [b.t, j])) }); drawDetail(false);
@@ -2331,6 +2513,10 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
     localization: { locale: 'zh-CN', dateFormat: 'yyyy-MM-dd' },
     handleScroll: { vertTouchDrag: false }
   });
+  // background spans for 大势符合 / 不符合, created first so they sit under the candles
+  const dBand = dsc.addSeries(LWC.HistogramSeries, { priceScaleId: 'band', base: 0, priceLineVisible: false, lastValueVisible: false, priceFormat: { type: 'custom', minMove: 1, formatter: () => '' }, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 1 } }) }, 0);
+  dBand.priceScale().applyOptions({ scaleMargins: { top: 0, bottom: 0 }, visible: false });
+  let dsBand = store.get('ztj-ds-band') !== '0';
   const dC = dsc.addSeries(LWC.CandlestickSeries, { priceFormat: pPrice, priceLineVisible: false }, 0);
   const dM5 = dsc.addSeries(LWC.LineSeries, Object.assign({ lineWidth: 1, priceFormat: pPrice }, quiet), 0);
   const dM10 = dsc.addSeries(LWC.LineSeries, Object.assign({ lineWidth: 2, priceFormat: pPrice }, quiet), 0);
@@ -2391,10 +2577,13 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
     pl(dDif, 0, c.faint, '', 0, false); pl(dDist, 0, c.faint, '', 0, false);
     pl(dFx, 80, c.accent, '高位', 1); pl(dFx, 70, c.up, '超买'); pl(dFx, 30, c.muted, '超卖'); pl(dFx, 20, c.teal, '底部');
     pl(dRsi, 70, c.up, '70'); pl(dRsi, 30, c.muted, '30'); pl(dRsi, 20, c.teal, '20');
-    const M = [];
-    if (isD && dsMarks && v.F) for (let i = 1; i < v.n; i++) {
-      if (v.F[i] && !v.F[i - 1]) M.push({ time: tm[i], position: 'belowBar', color: c.up, shape: 'arrowUp', text: dsNarrow ? '' : '站上' });
-      else if (!v.F[i] && v.F[i - 1]) M.push({ time: tm[i], position: 'aboveBar', color: c.down, shape: 'arrowDown', text: '' });
+    const M = [], showBand = isD && dsBand && v.F;
+    dBand.applyOptions({ visible: !!showBand });
+    dBand.setData(showBand ? tm.map((t, i) => v.F[i] == null ? { time: t } : { time: t, value: 1, color: v.F[i] ? c.up + '3a' : c.down + '24' }) : []);
+    $('ds-band').setAttribute('aria-pressed', String(dsBand)); $('ds-band').disabled = !isD;
+    if (isD && (dsMarks || showBand) && v.F) for (let i = 1; i < v.n; i++) {
+      if (v.F[i] && !v.F[i - 1]) M.push({ time: tm[i], position: 'belowBar', color: c.up, shape: 'arrowUp', text: showBand ? '大势符合' : (dsNarrow ? '' : '站上') });
+      else if (!v.F[i] && v.F[i - 1]) M.push({ time: tm[i], position: 'aboveBar', color: c.down, shape: 'arrowDown', text: showBand ? '不符合' : '' });
     }
     dMk.setMarkers(M);
     dsSetPane(dsPane, true);
@@ -2402,6 +2591,7 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
     dsHoverI = -1; dsReadout(v.n - 1);
     requestAnimationFrame(() => requestAnimationFrame(dsPlace));
   }
+  $('ds-band').addEventListener('click', () => { dsBand = !dsBand; store.set('ztj-ds-band', dsBand ? '1' : '0'); dsRerender(); });
   function dsRerender() { const r = dsc.timeScale().getVisibleLogicalRange(); dsRender(); if (r) dsc.timeScale().setVisibleLogicalRange(r); }
   function dsSetPane(p, quietly) {
     dsPane = p;
