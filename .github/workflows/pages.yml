@@ -1,0 +1,96 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '40 11 * * 1-5'   # 19:40 Beijing time, Monday to Friday
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'daily = refresh recent days; backfill = rebuild all history since 2010'
+        default: daily
+        type: choice
+        options: [daily, backfill]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  MODE: ${{ github.event.inputs.mode || 'daily' }}
+
+jobs:
+  shard:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        k: [0, 1, 2, 3, 4, 5, 6, 7]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install baostock pandas numpy
+      - run: python tools/make_data.py shard ${{ matrix.k }} 8 "$MODE"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shard-${{ matrix.k }}
+          path: out/
+          retention-days: 3
+
+  combine:
+    needs: shard
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install numpy
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          pattern: shard-*
+          merge-multiple: true
+      - run: python tools/make_data.py combine "$MODE"
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add base.json names.json picks
+          git commit -m "data $MODE" || echo "nothing to commit"
+          git pull --rebase
+          git push
+
+  deploy:
+    needs: combine
+    if: always() && (github.event_name == 'push' || needs.combine.result == 'success')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - run: |
+          mkdir -p _site
+          cp index.html _site/
+          for f in base.json names.json; do if [ -f "$f" ]; then cp "$f" _site/; fi; done
+          if [ -d picks ]; then cp -r picks _site/; fi
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
