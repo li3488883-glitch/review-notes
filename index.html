@@ -819,8 +819,37 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     } catch (e) { /* the daily file alone is still usable */ }
     return { name: last.name, bars };
   }
+  // daily history: 东方财富 first; if it refuses (it rate-limits cross-site requests), 腾讯 for the next five minutes
+  let emDownUntil = 0;
   async function emKlineRaw(secid, lmt) {
-    const d = await jsonpR('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + secid + '&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&lmt=' + lmt + '&end=20500101');
+    if (Date.now() > emDownUntil) {
+      try { return await emKlineEM(secid, lmt); } catch (e) { emDownUntil = Date.now() + 300000; }
+    }
+    return qqKline(secid, lmt);
+  }
+  function qqKline(secid, lmt) {
+    const [m, code] = secid.split('.');
+    const sym = (m === '1' ? 'sh' : /^(8|4|92)/.test(code) && code.length === 6 && !/^(399)/.test(code) ? 'bj' : 'sz') + code;
+    const v = 'rtqq_' + (++seq) + '_' + Date.now().toString(36);
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      const done = () => { clearTimeout(t); s.remove(); };
+      const t = setTimeout(() => { done(); reject(new Error('超时')); }, 9000);
+      s.onload = () => {
+        done(); const d = window[v]; try { delete window[v]; } catch (e) { window[v] = undefined; }
+        const k = d && d.data && d.data[sym]; const rows = k && (k.qfqday || k.day);
+        if (!rows || !rows.length) return reject(new Error('无数据'));
+        const nm = k.qt && k.qt[sym] ? k.qt[sym][1] : '';
+        resolve({ name: nm, code, bars: rows.map(x => { const c = +x[2], vol = +x[5]; return { t: x[0], o: +x[1], c, h: +x[3], l: +x[4], v: vol, a: vol * 100 * c }; }) });
+      };
+      s.onerror = () => { done(); reject(new Error('加载失败')); };
+      s.referrerPolicy = 'no-referrer';
+      s.src = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=' + v + '&param=' + sym + ',day,,,' + Math.min(lmt, 800) + ',qfq&r=' + Math.random();
+      document.head.appendChild(s);
+    });
+  }
+  async function emKlineEM(secid, lmt) {
+    const d = await jsonp('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + secid + '&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&lmt=' + lmt + '&end=20500101');
     if (!d || !d.data || !d.data.klines) throw new Error('无数据');
     return { name: d.data.name, code: d.data.code, bars: d.data.klines.map(s => { const x = s.split(','); return { t: x[0], o: +x[1], c: +x[2], h: +x[3], l: +x[4], v: +x[5], a: +x[6] }; }) };
   }
