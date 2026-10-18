@@ -495,7 +495,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       <details class="rt-rules">
         <summary>选股和卖出规则怎么来的</summary>
         <div class="notes">
-          <p><b>候选池</b>：当天成交额前 300 的股票，去掉 ST 和上市不足 60 个交易日的。原规则是"钱在哪，机会就在哪"，先看成交前排。</p>
+          <p><b>候选池</b>：当天成交额前 200 的股票，去掉 ST 和上市不足 60 个交易日的。原规则是"钱在哪，机会就在哪"，先看成交前排。</p>
           <p><b>必须满足</b>（全部满足才算符合条件）：收盘价在 5 日线上方；5 日线向上；离 5 日线不超过 8%（原规则说乖离太大不低吸，没给数字，8% 是取的中间值）；当天没有跌停（原规则：低吸从来不吸跌停）；最近 5 天的平均成交量比之前 20 天多两成以上，也就是在堆量。</p>
           <p><b>还要满足其中之一</b>：离 60 日最高价不到 3%（原规则：尽量选新高或阶段新高的股，阻力小）；或者今天出现了下面任一个买点。</p>
           <p><b>买点</b>：放量重新站上 5 日线（前一天还在 5 日线下，今天站上，成交量至少是前一天的 1.5 倍；原规则说倍量是强度验证，不必死扣翻倍）；回踩 5 日线或 10 日线（均线多头排列，当天最低价碰到均线附近 1% 以内，收盘守住）；收盘创 60 日新高。</p>
@@ -779,6 +779,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       document.head.appendChild(s);
     });
   }
+  async function jsonpR(url, timeout) { try { return await jsonp(url, timeout); } catch (e) { await new Promise(r => setTimeout(r, 700)); return jsonp(url, timeout); } }
   // 同花顺 uses fixed callback names, so requests that share a name run one after another
   const thsChain = {};
   function ths(path, cbName, timeout = 9000) {
@@ -818,14 +819,38 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     } catch (e) { /* the daily file alone is still usable */ }
     return { name: last.name, bars };
   }
-  async function emKline(secid, lmt) {
-    const d = await jsonp('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + secid + '&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&lmt=' + lmt + '&end=20500101');
+  async function emKlineRaw(secid, lmt) {
+    const d = await jsonpR('https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=' + secid + '&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56,f57&klt=101&fqt=1&lmt=' + lmt + '&end=20500101');
     if (!d || !d.data || !d.data.klines) throw new Error('无数据');
     return { name: d.data.name, code: d.data.code, bars: d.data.klines.map(s => { const x = s.split(','); return { t: x[0], o: +x[1], c: +x[2], h: +x[3], l: +x[4], v: +x[5], a: +x[6] }; }) };
   }
+  // history is fetched once per stock per day and kept in memory; later refreshes patch today's bar from one snapshot request
+  const kcache = new Map();
+  async function emKline(secid, lmt) {
+    const c = kcache.get(secid), day = bj().date;
+    if (c && c.day === day && c.lmt >= lmt) return { name: c.name, code: c.code, bars: c.bars.slice() };
+    const k = await emKlineRaw(secid, lmt);
+    kcache.set(secid, { day, lmt, name: k.name, code: k.code, bars: k.bars });
+    return { name: k.name, code: k.code, bars: k.bars.slice() };
+  }
+  function patch(secid, q) {
+    const c = kcache.get(secid); if (!c || !c.bars.length || !q) return;
+    const o = +q.f17, h = +q.f15, l = +q.f16, cl = +q.f2, v = +q.f5, a = +q.f6;
+    if (![o, h, l, cl, v].every(x => isFinite(x) && x > 0)) return;
+    const today = bj().date, bars = c.bars, last = bars[bars.length - 1];
+    const bar = { t: today, o, h, l, c: cl, v, a };
+    if (last.t === today) bars[bars.length - 1] = bar;
+    else if (last.t < today && (v !== last.v || cl !== last.c) && session() !== 'pre') bars.push(bar);
+  }
+  async function emSnap(ids) {
+    if (!ids.length) return {};
+    const d = await jsonpR('https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&secids=' + ids.join(',') + '&fields=f2,f5,f6,f12,f13,f14,f15,f16,f17,f18');
+    const out = {}; ((d && d.data && d.data.diff) || []).forEach(r => { out[r.f13 + '.' + r.f12] = r; });
+    return out;
+  }
   const FS = 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048';
   async function emTop(page) {
-    const d = await jsonp('https://push2.eastmoney.com/api/qt/clist/get?pn=' + page + '&pz=100&po=1&np=1&fltt=2&invt=2&fid=f6&fs=' + FS + '&fields=f2,f3,f6,f8,f12,f13,f14,f21');
+    const d = await jsonpR('https://push2.eastmoney.com/api/qt/clist/get?pn=' + page + '&pz=100&po=1&np=1&fltt=2&invt=2&fid=f6&fs=' + FS + '&fields=f2,f3,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18,f21');
     return (d && d.data && d.data.diff) || [];
   }
   async function emSuggest(q) {
@@ -963,12 +988,13 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
   // ---------- screening ----------
   async function loadScan() {
-    const pages = await Promise.all([1, 2, 3].map(p => emTop(p).catch(() => [])));
+    const pages = [];
+    for (const p of [1, 2]) { try { pages.push(await emTop(p)); } catch (e) { if (p === 1) throw new Error('成交额排行没拉到'); } }
     const rows = pages.flat().filter(r => typeof r.f2 === 'number' && r.f6 > 0 && !/ST|退/.test(r.f14));
     const seen = new Set(), list = [];
-    rows.forEach(r => { const id = r.f13 + '.' + r.f12; if (!seen.has(id)) { seen.add(id); list.push({ id, code: r.f12, name: r.f14, amt: r.f6, turn: r.f8, flt: r.f21 }); } });
+    rows.forEach(r => { const id = r.f13 + '.' + r.f12; if (!seen.has(id)) { seen.add(id); patch(id, r); list.push({ id, code: r.f12, name: r.f14, amt: r.f6, turn: r.f8, flt: r.f21 }); } });
     if (!list.length) throw new Error('候选池为空');
-    const res = await pool(list, 8, async st => {
+    const res = await pool(list, 4, async st => {
       const k = await emKline(st.id, 500);
       if (k.bars.length < 61) return null;
       const P = prep(k.bars), r = evalAt(k.bars, P, k.bars.length - 1, st.code, st.name);
@@ -1009,12 +1035,12 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   function renderScan() {
     const box = $('rt-scan'); box.innerHTML = '';
     const all = S.scan;
-    if (!all.length) { box.appendChild(el('div', 'rt-empty', S.scanErr ? '候选池没拉到：' + S.scanErr : '正在扫描成交额前 300 的股票……')); return; }
+    if (!all.length) { box.appendChild(el('div', 'rt-empty', S.scanErr ? '候选池没拉到：' + S.scanErr : '正在扫描成交额前 200 的股票……')); return; }
     const okL = all.filter(r => r.pass).sort((a, b) => b.bonus - a.bonus || b.amt - a.amt);
     const nearL = all.filter(r => r.fails === 1).sort((a, b) => b.amt - a.amt);
     const list = S.mode === 'ok' ? okL : S.mode === 'near' ? nearL : all.slice().sort((a, b) => a.fails - b.fails || b.amt - a.amt);
     $('rt-s-stats').innerHTML = '<span>候选 <b>' + all.length + '</b></span><span>符合 <b>' + okL.length + '</b></span><span>差一条 <b>' + nearL.length + '</b></span><span>扫描于 <b>' + bjAt(S.scanAt) + '</b></span>';
-    if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'ok' ? '今天成交额前 300 里没有全部符合条件的股票。' : '没有。')); return; }
+    if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'ok' ? '今天成交额前 200 里没有全部符合条件的股票。' : '没有。')); return; }
     list.slice(0, 120).forEach(r => box.appendChild(stockCard(r)));
     if (list.length > 120) box.appendChild(el('div', 'rt-empty', '只显示前 120 只，其余 ' + (list.length - 120) + ' 只按成交额排在后面。'));
   }
@@ -1023,7 +1049,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   // ---------- watchlist ----------
   async function refreshWatch() {
     const sess = session(), today = bj().date;
-    await pool(S.watch.slice(), 6, async st => {
+    try { const snap = await emSnap(S.watch.map(x => x.id).concat(S.detail ? [S.detail.id] : [])); Object.keys(snap).forEach(id => patch(id, snap[id])); } catch (e) {}
+    await pool(S.watch.slice(), 4, async st => {
       const k = await emKline(st.id, 500);
       const P = prep(k.bars), i = k.bars.length - 1, r = evalAt(k.bars, P, i, st.code, k.name || st.name);
       if (!r) { S.wdata[st.id] = { short: true, name: k.name, c: k.bars[i] && k.bars[i].c }; return; }
@@ -1180,7 +1207,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const errs = [];
     try { await loadMarket(); renderMarket(); } catch (e) { errs.push('大势 ' + e.message); if (!S.mkt) { $('rt-badge').textContent = '暂不可用'; $('rt-badge').className = 'v-badge'; $('rt-sum').textContent = '实时数据暂时拉不到，可以切到「大势过滤」看页面里保存的收盘数据。'; } }
     try { await refreshWatch(); } catch (e) { errs.push('自选 ' + e.message); }
-    if (full || Date.now() - S.lastScan > 55000) {
+    if (full || Date.now() - S.lastScan > 28000) {
       try { await loadScan(); S.scanErr = ''; S.lastScan = Date.now(); } catch (e) { S.scanErr = e.message; errs.push('选股 ' + e.message); }
       renderScan();
     }
@@ -2518,12 +2545,12 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
   function setView(v) {
     curView = v;
     Object.entries(VW).forEach(([k, [tab, sec]]) => { const on = k === v; sec.hidden = !on; tab.setAttribute('aria-selected', String(on)); tab.tabIndex = on ? 0 : -1; });
-    store.set('ztj-view', v);
+    store.set('ztj-view2', v);
     requestAnimationFrame(() => requestAnimationFrame(() => onShow(v)));
   }
   Object.entries(VW).forEach(([k, [tab]]) => tab.addEventListener('click', () => { if (k !== curView) { setView(k); window.scrollTo(0, 0); } }));
   $('tab-ds').parentElement.addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const ks = Object.keys(VW), nv = ks[(ks.indexOf(curView) + (e.key === 'ArrowRight' ? 1 : ks.length - 1)) % ks.length]; setView(nv); VW[nv][0].focus(); });
-  { let v0 = (location.hash || '').replace('#', ''); if (!VW[v0]) v0 = store.get('ztj-view'); if (!VW[v0]) v0 = 'rt'; setView(v0); }
+  { let v0 = (location.hash || '').replace('#', ''); if (!VW[v0]) v0 = store.get('ztj-view2'); if (!VW[v0]) v0 = 'rt'; setView(v0); }
   if (window.ResizeObserver) {
     let raf = 0;
     new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
