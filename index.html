@@ -862,24 +862,57 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     kcache.set(secid, { day, lmt, name: k.name, code: k.code, bars: k.bars });
     return { name: k.name, code: k.code, bars: k.bars.slice() };
   }
+  // q is a normalised snapshot {o,h,l,c,v,a,t?}
+  const fromEM = r => ({ o: +r.f17, h: +r.f15, l: +r.f16, c: +r.f2, v: +r.f5, a: +r.f6 });
   function patch(secid, q) {
     const c = kcache.get(secid); if (!c || !c.bars.length || !q) return;
-    const o = +q.f17, h = +q.f15, l = +q.f16, cl = +q.f2, v = +q.f5, a = +q.f6;
+    const o = q.o, h = q.h, l = q.l, cl = q.c, v = q.v, a = q.a;
     if (![o, h, l, cl, v].every(x => isFinite(x) && x > 0)) return;
-    const today = bj().date, bars = c.bars, last = bars[bars.length - 1];
+    const today = q.t || bj().date, bars = c.bars, last = bars[bars.length - 1];
     const bar = { t: today, o, h, l, c: cl, v, a };
     if (last.t === today) bars[bars.length - 1] = bar;
     else if (last.t < today && (v !== last.v || cl !== last.c) && session() !== 'pre') bars.push(bar);
   }
+  const qqSym = secid => { const [m, code] = secid.split('.'); return (m === '1' ? 'sh' : /^(8|4|92)/.test(code) ? 'bj' : 'sz') + code; };
+  // snapshot of a few stocks: 腾讯 quotes (one request), 东方财富 as the fallback
   async function emSnap(ids) {
     if (!ids.length) return {};
+    try {
+      const syms = ids.map(qqSym);
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script'); const t = setTimeout(() => { s.remove(); reject(new Error('超时')); }, 8000);
+        s.onload = () => { clearTimeout(t); s.remove(); resolve(); }; s.onerror = () => { clearTimeout(t); s.remove(); reject(new Error('加载失败')); };
+        s.referrerPolicy = 'no-referrer'; s.charset = 'gbk'; s.src = 'https://qt.gtimg.cn/q=' + syms.join(',') + '&r=' + Math.random(); document.head.appendChild(s);
+      });
+      const out = {};
+      ids.forEach((id, k) => { const raw = window['v_' + syms[k]]; if (!raw) return; const a = String(raw).split('~'); if (a.length < 40) return; const d = a[30] || ''; out[id] = { o: +a[5], h: +a[33], l: +a[34], c: +a[3], v: +a[6], a: +a[37] * 1e4, t: d.length >= 8 ? d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6, 8) : undefined }; });
+      if (Object.keys(out).length) return out;
+    } catch (e) {}
     const d = await jsonpR('https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&secids=' + ids.join(',') + '&fields=f2,f5,f6,f12,f13,f14,f15,f16,f17,f18');
-    const out = {}; ((d && d.data && d.data.diff) || []).forEach(r => { out[r.f13 + '.' + r.f12] = r; });
+    const out = {}; ((d && d.data && d.data.diff) || []).forEach(r => { out[r.f13 + '.' + r.f12] = fromEM(r); });
     return out;
   }
+  // turnover ranking: 东方财富, or 新浪 when 东方财富 refuses
+  async function sinaTop(page) {
+    const cb = 'rtsn_' + (++seq) + '_' + Date.now().toString(36);
+    const d = await new Promise((resolve, reject) => {
+      const s = document.createElement('script'); const t = setTimeout(() => { done(); reject(new Error('超时')); }, 9000);
+      const done = () => { clearTimeout(t); window[cb] = undefined; s.remove(); };
+      window[cb] = x => { done(); resolve(x); }; s.onerror = () => { done(); reject(new Error('加载失败')); };
+      s.referrerPolicy = 'no-referrer';
+      s.src = 'https://vip.stock.finance.sina.com.cn/quotes_service/api/jsonp_v2.php/' + cb + '/Market_Center.getHQNodeData?page=' + page + '&num=100&sort=amount&asc=0&node=hs_a&symbol=&_s_r_a=page';
+      document.head.appendChild(s);
+    });
+    return (d || []).map(r => ({ f2: +r.trade, f3: +r.changepercent, f5: +r.volume / 100, f6: +r.amount, f8: +r.turnoverratio, f12: r.code, f13: /^sh/.test(r.symbol) ? 1 : 0, f14: r.name, f15: +r.high, f16: +r.low, f17: +r.open, f18: +r.settlement, f21: +r.nmc * 1e4 }));
+  }
   const FS = 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048';
+  let topDownUntil = 0;
   async function emTop(page) {
-    const d = await jsonpR('https://push2.eastmoney.com/api/qt/clist/get?pn=' + page + '&pz=100&po=1&np=1&fltt=2&invt=2&fid=f6&fs=' + FS + '&fields=f2,f3,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18,f21');
+    if (Date.now() > topDownUntil) { try { return await emTopEM(page); } catch (e) { topDownUntil = Date.now() + 300000; } }
+    return sinaTop(page);
+  }
+  async function emTopEM(page) {
+    const d = await jsonp('https://push2.eastmoney.com/api/qt/clist/get?pn=' + page + '&pz=100&po=1&np=1&fltt=2&invt=2&fid=f6&fs=' + FS + '&fields=f2,f3,f5,f6,f8,f12,f13,f14,f15,f16,f17,f18,f21');
     return (d && d.data && d.data.diff) || [];
   }
   async function emSuggest(q) {
@@ -1021,7 +1054,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     for (const p of [1, 2]) { try { pages.push(await emTop(p)); } catch (e) { if (p === 1) throw new Error('成交额排行没拉到'); } }
     const rows = pages.flat().filter(r => typeof r.f2 === 'number' && r.f6 > 0 && !/ST|退/.test(r.f14));
     const seen = new Set(), list = [];
-    rows.forEach(r => { const id = r.f13 + '.' + r.f12; if (!seen.has(id)) { seen.add(id); patch(id, r); list.push({ id, code: r.f12, name: r.f14, amt: r.f6, turn: r.f8, flt: r.f21 }); } });
+    rows.forEach(r => { const id = r.f13 + '.' + r.f12; if (!seen.has(id)) { seen.add(id); patch(id, fromEM(r)); list.push({ id, code: r.f12, name: r.f14, amt: r.f6, turn: r.f8, flt: r.f21 }); } });
     if (!list.length) throw new Error('候选池为空');
     const res = await pool(list, 4, async st => {
       const k = await emKline(st.id, 500);
