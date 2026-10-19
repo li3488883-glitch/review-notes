@@ -8,10 +8,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: 'daily = refresh recent days; backfill = rebuild all history since 2010'
+        description: 'daily = 补最近的交易日；recompute = 规则改了，用存好的原始数据重算全部历史（几分钟）；backfill = 从 BaoStock 重新下载全部历史'
         default: daily
         type: choice
-        options: [daily, backfill]
+        options: [daily, recompute, backfill]
 
 permissions:
   contents: write
@@ -24,6 +24,8 @@ concurrency:
 
 env:
   MODE: ${{ github.event.inputs.mode || 'daily' }}
+  NSHARD: 16
+  GH_TOKEN: ${{ github.token }}
 
 jobs:
   shard:
@@ -33,14 +35,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        k: [0, 1, 2, 3, 4, 5, 6, 7]
+        k: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install baostock pandas numpy
-      - run: python tools/make_data.py shard ${{ matrix.k }} 8 "$MODE"
+      - name: get stored raw data
+        if: env.MODE != 'backfill'
+        run: gh release download raw-data -R "$GITHUB_REPOSITORY" -p "raw_${NSHARD}_${{ matrix.k }}.npz" -D cache || echo "no stored raw data for this shard yet"
+      - run: python tools/make_data.py shard ${{ matrix.k }} $NSHARD "$MODE"
+      - name: store raw data
+        run: |
+          f="cache/raw_${NSHARD}_${{ matrix.k }}.npz"
+          [ -f "$f" ] || exit 0
+          gh release view raw-data -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create raw-data -R "$GITHUB_REPOSITORY" --title "raw data" --notes "原始日线（后复权），由定时任务自动维护" --latest=false || true
+          for i in 1 2 3 4 5; do gh release upload raw-data -R "$GITHUB_REPOSITORY" "$f" --clobber && break; sleep $((i * 5)); done
       - uses: actions/upload-artifact@v4
         with:
           name: shard-${{ matrix.k }}
