@@ -1178,18 +1178,23 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   function histIndex() { if (!HS.index) HS.index = jget('picks/index.json?d=' + bj().date).catch(e => { HS.index = null; throw e; }); return HS.index; }
   function histYear(y) { if (!HS.years[y]) HS.years[y] = jget('picks/' + y + '.json?d=' + bj().date).catch(e => { delete HS.years[y]; throw e; }); return HS.years[y]; }
   function histNames() { if (!HS.names) HS.names = jget('names.json?d=' + bj().date).catch(() => ({})); return HS.names; }
+  // past years never change, so they are kept in this browser after the first load
   function thsYear(code, y) {
-    const k = code + '_' + y;
-    if (!HS.ths[k]) HS.ths[k] = ths('bk_' + code + '/01/' + y + '.js', 'quotebridge_v4_line_bk_' + code + '_01_' + y)
-      .then(d => String((d && d.data) || '').split(';').filter(Boolean).map(r => { const x = r.split(','); return { t: ymd(x[0]), c: +x[4], a: +x[6] }; }))
-      .catch(() => []);
+    const k = code + '_' + y, sk = 'rt-ths-' + k, past = y < +bj().year;
+    if (!HS.ths[k]) {
+      if (past) { try { const c = JSON.parse(store.get(sk) || 'null'); if (c && c.length) { HS.ths[k] = Promise.resolve(c); return HS.ths[k]; } } catch (e) {} }
+      const load = () => ths('bk_' + code + '/01/' + y + '.js', 'quotebridge_v4_line_bk_' + code + '_01_' + y)
+        .then(d => String((d && d.data) || '').split(';').filter(Boolean).map(r => { const x = r.split(','); return { t: ymd(x[0]), c: +x[4], a: +x[6] }; }));
+      HS.ths[k] = load().catch(() => new Promise(r => setTimeout(r, 1500)).then(load)).then(rows => { if (past && rows.length) store.set(sk, JSON.stringify(rows)); return rows; })
+        .catch(e => { delete HS.ths[k]; throw e; });
+    }
     return HS.ths[k];
   }
   // 大势 on a past day, from 同花顺's yearly index files (全A starts in May 2018)
   async function dashiAt(day) {
     const y = +day.slice(0, 4), res = {};
     for (const [k, code] of LINES) {
-      const bars = (await thsYear(code, y - 1)).concat(await thsYear(code, y));
+      const bars = (y - 1 >= 2016 ? await thsYear(code, y - 1).catch(e => (day.slice(5) < '02-15' ? Promise.reject(e) : [])) : []).concat(await thsYear(code, y));
       let i = -1; for (let j = bars.length - 1; j >= 0; j--) if (bars[j].t <= day) { i = j; break; }
       if (i < 9 || bars[i].t !== day) return null;
       let m = 0; for (let j = i - 9; j <= i; j++) m += bars[j].c; m /= 10;
@@ -1220,7 +1225,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       S.histDay = k; S.histData = data[k]; S.histKeys = keys; S.histDashi = undefined;
       $('rt-day').value = k; note.textContent = '正在看 ' + k + ' 收盘后的结果';
       renderHist();
-      const dd = await dashiAt(k).catch(() => null);
+      const dd = k < '2018-05-31' ? null : await dashiAt(k).catch(() => ({ err: true }));
       if (S.histDay === k) { S.histDashi = dd; renderHist(); }
     } catch (e) { note.textContent = '历史选股文件还没生成（每天收盘后自动生成），请稍后再试。'; }
   }
@@ -1236,6 +1241,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const names = await histNames();
     if (D === undefined) { g.className = 'rt-gate'; g.textContent = day + '：正在读取当天的大势……'; }
     else if (D === null) { g.className = 'rt-gate'; g.textContent = day + '：这一天没有大势数据（同花顺全A 从 2018 年 5 月才开始有），下面只看个股条件。'; }
+    else if (D.err) { g.className = 'rt-gate part'; g.textContent = day + '：这天的大势数据暂时没拉到（同花顺偶尔拒绝），过几秒点一下 ◀ ▶ 再回来就会重试。下面先看个股条件。'; }
     else if (!D.ok) { g.className = 'rt-gate no'; g.textContent = day + '：大势不符合（三条线没有都在 10 日线上方），成交额 ' + yi(D.amt) + '。按原规则这天不选股，下面只当观察。'; }
     else if (D.lv === 0) { g.className = 'rt-gate no'; g.textContent = day + '：大势符合，但成交额 ' + yi(D.amt) + '，不到 2 万亿，按原规则休息。'; }
     else if (D.lv === 1) { g.className = 'rt-gate part'; g.textContent = day + '：大势符合，成交额 ' + yi(D.amt) + '，只算局部机会。'; }
