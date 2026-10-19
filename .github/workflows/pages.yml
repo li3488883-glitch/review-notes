@@ -5,6 +5,8 @@ on:
     branches: [main]
   schedule:
     - cron: '40 11 * * 1-5'   # 19:40 Beijing time, Monday to Friday
+    - cron: '10 13 * * 1-5'   # 21:10 backup: GitHub sometimes skips a scheduled run
+    - cron: '30 15 * * 1-5'   # 23:30 backup
   workflow_dispatch:
     inputs:
       mode:
