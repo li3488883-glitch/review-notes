@@ -439,107 +439,171 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .st-chip.no { color: var(--muted); background: var(--chip); font-weight: 500; }
 .kind-chip { font-weight: 500; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
 
-/* ================= glass layer: frosted surfaces over a slowly moving color field ================= */
-:root {
-  --field-a: #8fb4ff; --field-b: #ffb3c1; --field-c: #9fe6d4; --field-d: #ffd59a;
-  --g-bg: rgba(255, 255, 255, 0.58); --g-bg-strong: rgba(255, 255, 255, 0.74); --g-line: rgba(255, 255, 255, 0.75); --g-edge: rgba(20, 30, 50, 0.08);
-  --g-hi: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(255, 255, 255, 0.25);
-  --g-shadow: 0 1px 1px rgba(20, 30, 50, 0.04), 0 10px 30px -8px rgba(30, 45, 80, 0.18);
-  --g-blur: saturate(170%) blur(22px);
-  --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
-  --sk-bg: rgba(255, 255, 255, 0.66);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --field-a: #1f3f8f; --field-b: #6b2348; --field-c: #0f5a55; --field-d: #5a3d10;
-    --g-bg: rgba(22, 30, 42, 0.52); --g-bg-strong: rgba(22, 30, 42, 0.7); --g-line: rgba(255, 255, 255, 0.10); --g-edge: rgba(0, 0, 0, 0.35);
-    --g-hi: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(255, 255, 255, 0.03);
-    --g-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 12px 34px -10px rgba(0, 0, 0, 0.6);
-    --sk-bg: rgba(24, 32, 44, 0.6);
-  }
-}
-:root[data-theme="dark"] {
-  --field-a: #1f3f8f; --field-b: #6b2348; --field-c: #0f5a55; --field-d: #5a3d10;
-  --g-bg: rgba(22, 30, 42, 0.52); --g-bg-strong: rgba(22, 30, 42, 0.7); --g-line: rgba(255, 255, 255, 0.10); --g-edge: rgba(0, 0, 0, 0.35);
-  --g-hi: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(255, 255, 255, 0.03);
-  --g-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 12px 34px -10px rgba(0, 0, 0, 0.6);
-  --sk-bg: rgba(24, 32, 44, 0.6);
+/* ================= liquid glass (night) =================
+   Always dark: a deep night field with slow light behind thick, edge-lit glass.
+   The one loud moment is the verdict, which sits on a breathing light in its own color. */
+:root, :root[data-theme="light"], :root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #05070f;
+  --panel: rgba(14, 18, 38, 0.62);
+  --ink: #f2f4ff; --muted: #a8afce; --faint: #6d7498;
+  --line: rgba(255, 255, 255, 0.10); --chip: rgba(255, 255, 255, 0.07);
+  --up: #ff5a62; --down: #2fd48c; --accent: #93a8ff; --rsrs: #ffb547; --teal: #45e0d2; --violet: #b89dff; --fx: #ffd15c; --div: #ff6fae;
+  --ok: #45e0d2; --part: #ffb547; --no: #7c83a3;
+  --shadow: 0 24px 60px -28px rgba(0, 0, 0, 0.75);
+  --glass: rgba(14, 18, 38, 0.55);
+  --font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  --font-data: var(--font-body);
+  --g-fill: linear-gradient(150deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.055) 42%, rgba(255, 255, 255, 0.03) 100%);
+  --g-rim: linear-gradient(140deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.10) 30%, rgba(255, 255, 255, 0.03) 62%, rgba(255, 255, 255, 0.28) 100%);
+  --g-blur: blur(30px) saturate(190%);
+  --g-depth: inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -18px 40px -24px rgba(255, 255, 255, 0.10), 0 30px 70px -34px rgba(0, 0, 0, 0.8);
+  --spring: cubic-bezier(0.34, 1.45, 0.5, 1);
+  --glow: var(--accent);
 }
 html { background: var(--bg); }
-body { background: transparent; position: relative; isolation: isolate; }
-/* the color field: soft radial blobs drifting slowly (transform only, cheap on phones) */
-.glass-field { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--bg); }
-.glass-field i { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; opacity: .55; will-change: transform; }
-.glass-field i:nth-child(1) { left: -20vmax; top: -25vmax; background: radial-gradient(circle at center, var(--field-a), transparent 62%); animation: gf1 38s ease-in-out infinite alternate; }
-.glass-field i:nth-child(2) { right: -25vmax; top: -10vmax; background: radial-gradient(circle at center, var(--field-b), transparent 62%); animation: gf2 46s ease-in-out infinite alternate; }
-.glass-field i:nth-child(3) { left: 10vmax; bottom: -35vmax; background: radial-gradient(circle at center, var(--field-c), transparent 62%); animation: gf3 52s ease-in-out infinite alternate; }
-.glass-field i:nth-child(4) { right: -15vmax; bottom: -30vmax; background: radial-gradient(circle at center, var(--field-d), transparent 60%); animation: gf1 60s ease-in-out infinite alternate-reverse; opacity: .4; }
-@keyframes gf1 { to { transform: translate3d(14vmax, 10vmax, 0) scale(1.12); } }
-@keyframes gf2 { to { transform: translate3d(-12vmax, 14vmax, 0) scale(0.92); } }
-@keyframes gf3 { to { transform: translate3d(10vmax, -12vmax, 0) scale(1.08); } }
+body { background: transparent; position: relative; isolation: isolate; font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased; letter-spacing: 0.01em; }
 
-/* frosted surfaces */
+/* the night field */
+.glass-field { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+  background: radial-gradient(120% 80% at 50% -10%, #1a1f4d 0%, #0b0e24 45%, #05070f 100%); }
+.glass-field i { position: absolute; border-radius: 50%; will-change: transform; mix-blend-mode: screen; }
+.glass-field i:nth-child(1) { width: 62vmax; height: 62vmax; left: -18vmax; top: -22vmax; background: radial-gradient(circle, rgba(88, 92, 255, 0.55), transparent 64%); animation: gf1 34s ease-in-out infinite alternate; }
+.glass-field i:nth-child(2) { width: 56vmax; height: 56vmax; right: -20vmax; top: 4vmax; background: radial-gradient(circle, rgba(170, 70, 255, 0.42), transparent 64%); animation: gf2 42s ease-in-out infinite alternate; }
+.glass-field i:nth-child(3) { width: 60vmax; height: 60vmax; left: 8vmax; bottom: -36vmax; background: radial-gradient(circle, rgba(20, 190, 210, 0.34), transparent 64%); animation: gf3 48s ease-in-out infinite alternate; }
+.glass-field i:nth-child(4) { width: 40vmax; height: 40vmax; right: 6vmax; bottom: -16vmax; background: radial-gradient(circle, rgba(255, 70, 130, 0.22), transparent 64%); animation: gf1 56s ease-in-out infinite alternate-reverse; }
+/* fine grain so the glass has something to bend */
+.glass-field::after { content: ""; position: absolute; inset: 0; opacity: 0.06; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+@keyframes gf1 { to { transform: translate3d(12vmax, 9vmax, 0) scale(1.1); } }
+@keyframes gf2 { to { transform: translate3d(-10vmax, 12vmax, 0) scale(0.9); } }
+@keyframes gf3 { to { transform: translate3d(9vmax, -10vmax, 0) scale(1.08); } }
+
+/* ---------- thick glass ---------- */
 .appbar, .card, .cond, .rt-thermo, .ds-hero, .tabs {
-  background: var(--g-bg); border-color: var(--g-line);
+  background: var(--g-fill); border: 0;
   -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
-  box-shadow: var(--g-hi), var(--g-shadow);
+  box-shadow: var(--g-depth); position: relative;
 }
-.appbar { background: var(--g-bg-strong); border-bottom: 1px solid var(--g-line); box-shadow: var(--g-hi), 0 6px 24px -12px rgba(20, 30, 60, .25); }
-body::before { background: var(--g-bg-strong); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); }
-.card, .cond, .rt-thermo { border: 1px solid var(--g-line); border-radius: 18px; position: relative; }
-.card { padding: 16px 18px; }
-.ds-hero { border: 1px solid var(--g-line); border-radius: 22px; padding: 18px 20px; position: relative; overflow: hidden; }
-/* a specular sheen along the top edge, like light caught in glass */
-.card::after, .ds-hero::after, .cond::after {
+/* the lit rim: a 1px gradient border drawn with a mask */
+.card::before, .cond::before, .rt-thermo::before, .ds-hero::before, .tabs::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: var(--g-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+/* light caught in the top-left of the glass */
+.card::after, .cond::after, .ds-hero::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: linear-gradient(160deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 28%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, .12) 100%);
-  mix-blend-mode: soft-light; opacity: .9;
+  background: radial-gradient(110% 70% at 12% -8%, rgba(255, 255, 255, 0.16), transparent 52%);
 }
-.tabs { border: 1px solid var(--g-line); border-radius: 14px; padding: 4px; position: relative; }
-.tabs button { position: relative; z-index: 1; border-radius: 10px; transition: color .25s ease; }
+.card { border-radius: 26px; padding: 18px 20px; }
+.cond, .rt-thermo { border-radius: 22px; }
+.cond.ref { background: rgba(255, 255, 255, 0.025); box-shadow: none; }
+.cond.ref::before { opacity: .45; }
+.card > *, .cond > *, .ds-hero > * { position: relative; z-index: 1; }
+
+/* app bar: a floating glass strip */
+.appbar { background: rgba(10, 13, 30, 0.55); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 14px 40px -24px rgba(0, 0, 0, 0.9); }
+body::before { background: rgba(10, 13, 30, 0.7); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); }
+.brand h1 { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.02em; }
+
+/* tabs: a capsule with a brighter glass pill that springs to the selection */
+.tabs { border-radius: 999px; padding: 4px; }
+.tabs button { position: relative; z-index: 1; border-radius: 999px; color: var(--muted); transition: color .25s ease, transform .18s var(--spring); }
+.tabs button[aria-selected="true"] { color: var(--ink); }
 .tabs.has-ind button[aria-selected="true"] { background: transparent; box-shadow: none; }
-.tab-ind { position: absolute; top: 4px; bottom: 4px; left: 0; width: 0; border-radius: 10px; z-index: 0; pointer-events: none;
-  background: var(--panel); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 4px 14px -4px rgba(30, 45, 80, .3), inset 0 1px 0 rgba(255, 255, 255, .7);
-  transition: transform .45s var(--spring), width .45s var(--spring); }
-/* charts keep a solid background so lines stay crisp */
-.chart-box { background: var(--panel); border-radius: 12px; overflow: hidden; }
-/* stock cards: translucent, no blur (there can be a hundred of them) */
-.sk { background: var(--sk-bg); border-color: var(--g-line); border-radius: 14px; box-shadow: var(--g-hi); transition: transform .2s var(--spring), box-shadow .2s ease, border-color .2s ease; }
-.sk:hover { transform: translateY(-2px); box-shadow: var(--g-hi), var(--g-shadow); }
-.sk.okk { border-color: color-mix(in srgb, var(--up) 45%, var(--g-line)); }
-.ghost, .seg, .mk, .star, .rt-search input, .rt-day input[type="date"] { background: var(--sk-bg); border-color: var(--g-line); }
+.tab-ind { position: absolute; top: 4px; bottom: 4px; left: 0; width: 0; border-radius: 999px; z-index: 0; pointer-events: none;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.10));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 6px 18px -6px rgba(0, 0, 0, 0.6);
+  transition: transform .5s var(--spring), width .5s var(--spring); }
+
+/* ---------- the verdict: the one loud thing ---------- */
+.ds-hero { border-radius: 34px; padding: 24px 26px 22px; overflow: hidden; }
+.ds-hero:has(.v-badge.ok) { --glow: var(--up); }
+.ds-hero:has(.v-badge.no) { --glow: var(--down); }
+.ds-hero .verdict { position: relative; }
+.ds-hero .verdict::before {
+  content: ""; position: absolute; z-index: -1; left: -40px; top: 50%; width: min(520px, 90vw); height: 220px; transform: translateY(-50%);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 55%, transparent), transparent);
+  filter: blur(18px); opacity: .55; animation: breathe 7s ease-in-out infinite; pointer-events: none;
+}
+@keyframes breathe { 0%, 100% { opacity: .38; transform: translateY(-50%) scale(0.94); } 50% { opacity: .62; transform: translateY(-50%) scale(1.04); } }
+.v-badge { font-family: var(--font-display); font-weight: 800; font-size: clamp(44px, 7.4vw, 72px); line-height: 1.02; letter-spacing: 0.01em;
+  text-shadow: 0 0 34px color-mix(in srgb, currentColor 45%, transparent); transition: color .6s ease, text-shadow .6s ease; }
+.v-date { color: var(--muted); }
+.eyebrow { color: var(--muted); letter-spacing: 0.06em; }
+.h-card { font-family: var(--font-display); font-weight: 650; letter-spacing: 0.02em; }
+.ds-hero.condense { animation: condense 1s var(--spring) both; }
+@keyframes condense { from { opacity: 0; transform: scale(.965); -webkit-backdrop-filter: blur(0); backdrop-filter: blur(0); } to { opacity: 1; transform: none; } }
+
+/* ---------- controls: glass pills ---------- */
+.ghost, .star, .mk { background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.14); color: var(--ink); border-radius: 999px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
+.ghost:hover, .star:hover, .mk:hover { background: rgba(255, 255, 255, 0.12); }
+.ghost[aria-expanded="true"] { background: rgba(255, 255, 255, 0.16); }
+.seg { border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 999px; background: rgba(255, 255, 255, 0.05); padding: 2px; gap: 2px; }
+.seg button { border-radius: 999px; }
+.seg button + button { border-left: 0; }
+.seg button[aria-pressed="true"] { background: linear-gradient(160deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.10)); color: var(--ink); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.rt-search input, .rt-day input[type="date"], .rt-io textarea { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 16px; color: var(--ink); }
+.rt-search input::placeholder { color: var(--faint); }
+.rt-sugg { background: rgba(16, 20, 42, 0.92); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px; }
 .ghost, .seg button, .mk, .star, .tabs button, .sk { -webkit-tap-highlight-color: transparent; }
-.ghost, .mk, .star, .seg button, .tabs button { transition: transform .18s var(--spring), background-color .2s ease, color .2s ease; }
-.ghost:active, .mk:active, .star:active, .seg button:active, .tabs button:active { transform: scale(.95); }
+.ghost, .mk, .star, .seg button { transition: transform .18s var(--spring), background-color .2s ease, color .2s ease; }
+.ghost:active, .mk:active, .star:active, .seg button:active, .tabs button:active { transform: scale(.94); }
+
+/* ---------- stock tiles: thin glass, no blur (there can be a hundred) ---------- */
+.sk { background: linear-gradient(160deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.03)); border: 1px solid rgba(255, 255, 255, 0.10); border-radius: 22px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10); transition: border-color .25s ease, background-color .25s ease, transform .18s var(--spring); }
+.sk:hover { border-color: rgba(255, 255, 255, 0.24); }
 .sk:active { transform: scale(.985); }
-.v-badge { transition: color .5s ease; }
-.rt-gate { transition: background-color .4s ease, color .4s ease; border-radius: 12px; }
-/* entrance: cards float up once, the first time a view is shown */
-.view.enter .card, .view.enter .ds-hero, .view.enter .cond, .view.enter .conds-wrap, .view.enter .rt-thermo { animation: rise .6s var(--spring) both; animation-delay: calc(var(--i, 0) * 45ms); }
-@keyframes rise { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+.sk.okk { border-color: color-mix(in srgb, var(--up) 55%, transparent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 0 0 1px color-mix(in srgb, var(--up) 18%, transparent), 0 18px 40px -26px color-mix(in srgb, var(--up) 70%, transparent); }
+.sk.hld { border-color: color-mix(in srgb, var(--up) 26%, rgba(255, 255, 255, 0.10)); }
+.sk.sell { border-color: color-mix(in srgb, var(--down) 55%, transparent); background: linear-gradient(160deg, color-mix(in srgb, var(--down) 12%, transparent), rgba(255, 255, 255, 0.03)); }
+.sk.warn { border-color: color-mix(in srgb, var(--rsrs) 45%, transparent); }
+.sk-name { font-weight: 650; }
+.ok-chip, .no-chip, .tr-chip, .bn-chip, .sg-chip, .st-chip, .kind-chip { border-radius: 999px; }
+.st-chip.buy { color: #fff; background: linear-gradient(160deg, color-mix(in srgb, var(--up) 92%, #fff), var(--up)); box-shadow: 0 6px 18px -8px var(--up), inset 0 1px 0 rgba(255, 255, 255, 0.35); }
+.st-chip.hold { color: color-mix(in srgb, var(--up) 85%, #fff); background: color-mix(in srgb, var(--up) 16%, transparent); }
+.bn-chip { color: var(--teal); border-color: color-mix(in srgb, var(--teal) 35%, transparent); background: color-mix(in srgb, var(--teal) 8%, transparent); }
+.no-chip { background: rgba(255, 255, 255, 0.04); }
+.rt-gate { border-radius: 16px; background: rgba(255, 255, 255, 0.05); transition: background-color .4s ease, color .4s ease; }
+.rt-empty { border-color: rgba(255, 255, 255, 0.14); border-radius: 18px; }
+
+/* charts sit on a darker well of glass so lines stay crisp */
+.chart-box { background: rgba(4, 6, 18, 0.42); border-radius: 20px; overflow: hidden; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.05); }
+
 /* numbers that change on a refresh glow briefly */
 .flash-up { animation: flashUp 1.2s ease-out; } .flash-down { animation: flashDn 1.2s ease-out; }
-@keyframes flashUp { 0% { background: color-mix(in srgb, var(--up) 28%, transparent); } 100% { background: transparent; } }
-@keyframes flashDn { 0% { background: color-mix(in srgb, var(--down) 28%, transparent); } 100% { background: transparent; } }
-.cond-nums b, .sk-px, .rt-d-head .big { border-radius: 4px; }
-/* live dot next to the time while the market is open */
-.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--up); margin-right: 6px; vertical-align: 1px; box-shadow: 0 0 0 0 color-mix(in srgb, var(--up) 60%, transparent); animation: pulse 2s ease-out infinite; }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--up) 55%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
-/* no backdrop-filter support: solid panels */
+@keyframes flashUp { 0% { background: color-mix(in srgb, var(--up) 32%, transparent); } 100% { background: transparent; } }
+@keyframes flashDn { 0% { background: color-mix(in srgb, var(--down) 32%, transparent); } 100% { background: transparent; } }
+.cond-nums b, .sk-px, .rt-d-head .big { border-radius: 6px; }
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--up); margin-right: 6px; vertical-align: 1px; animation: pulse 2s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--up) 60%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .appbar, .card, .cond, .rt-thermo, .ds-hero, .tabs { background: var(--panel); }
+  .appbar, .card, .cond, .rt-thermo, .ds-hero, .tabs { background: #10142c; }
 }
 @media (max-width: 560px) {
-  .card { padding: 14px 14px; border-radius: 16px; }
-  .ds-hero { padding: 16px 14px; border-radius: 18px; }
-  .glass-field i { opacity: .45; }
+  .card { padding: 16px 15px; border-radius: 24px; }
+  .ds-hero { padding: 20px 18px 18px; border-radius: 28px; }
+  .cond { border-radius: 20px; }
+  .glass-field i { opacity: .8; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .glass-field i, .live-dot { animation: none; }
-  .view.enter .card, .view.enter .ds-hero, .view.enter .cond, .view.enter .conds-wrap, .view.enter .rt-thermo { animation: none; }
+  .glass-field i, .live-dot, .ds-hero .verdict::before, .ds-hero.condense { animation: none; }
   .tab-ind, .sk, .ghost, .mk, .star, .seg button, .tabs button { transition: none; }
   .flash-up, .flash-down { animation: none; }
 }
+/* glass makes every card its own layer: lift the one with an open search list above its neighbours */
+.card:focus-within, .card:has(.rt-sugg:not([hidden])) { z-index: 6; }
+.card > .rt-search { z-index: 4; }
+/* five gauges in one row on wide screens; on phones the 科技闸门 card takes the full width */
+@media (min-width: 1000px) { #rt-conds { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+@media (max-width: 999px) and (min-width: 341px) { #rt-conds > .cond:nth-child(5):last-child { grid-column: 1 / -1; } }
+.sk-name small { color: var(--muted); }
 
 </style>
 
@@ -1387,7 +1451,9 @@ body::before { background: var(--g-bg-strong); -webkit-backdrop-filter: var(--g-
       if (r.sell.length && r.live) h += '<p class="sk-why">盘中跌破、还没收盘：原规则是不能快速收回或收盘跌破才出。</p>';
     } else {
       h += '<div class="sk-chips">' + stateChip(r) + (r.tech ? chip('kind-chip', '科技') : '') + '</div>';
-      h += '<div class="sk-chips">' + Object.keys(HOLD_TXT).map(k => chip(r.hold[k] ? 'ok-chip' : 'no-chip', HOLD_TXT[k])).join('') + '</div>';
+      // only the unmet trend conditions are worth a chip; a stock in its uptrend shows none
+      const miss = Object.keys(HOLD_TXT).filter(k => !r.hold[k]);
+      if (miss.length) h += '<div class="sk-chips">' + miss.map(k => chip('no-chip', HOLD_TXT[k])).join('') + '</div>';
       const bn = bonusChips(r);
       if (bn) h += '<div class="sk-chips">' + bn + '</div>';
       if (r.warn && r.warn.length) h += '<div class="sk-chips">' + r.warn.map(x => chip('sg-chip warn', x)).join('') + '</div>';
@@ -1956,12 +2022,12 @@ body::before { background: var(--g-bg-strong); -webkit-backdrop-filter: var(--g-
       addEventListener('resize', move); if (document.fonts && document.fonts.ready) document.fonts.ready.then(move);
       requestAnimationFrame(() => { ind.style.transition = 'none'; move(); requestAnimationFrame(() => { ind.style.transition = ''; }); });
     }
-    // cards float in the first time each view is shown
+    // the verdict glass condenses once, the first time each view is shown
     const seen = new Set();
     const enter = v => {
       if (v.hidden || seen.has(v.id)) return; seen.add(v.id);
-      [...v.querySelectorAll('.card, .ds-hero, .cond, .conds-wrap, .rt-thermo')].forEach((c, i) => c.style.setProperty('--i', Math.min(i, 12)));
-      v.classList.add('enter'); setTimeout(() => v.classList.remove('enter'), 1600);
+      const h = v.querySelector('.ds-hero'); if (!h) return;
+      h.classList.add('condense'); setTimeout(() => h.classList.remove('condense'), 1200);
     };
     document.querySelectorAll('.view').forEach(v => { enter(v); new MutationObserver(() => enter(v)).observe(v, { attributes: true, attributeFilter: ['hidden'] }); });
   })();
