@@ -122,12 +122,14 @@ def load_cache(k, N):
     if not os.path.exists(p):
         return None
     z = np.load(p, allow_pickle=False)
-    ids, off = list(z['ids']), z['off']
+    # read every array once: indexing an npz file decompresses the whole array on each access
+    arr = {f: z[f] for f in FIELDS}
+    ids, off, rcd, rcv = list(z['ids']), z['off'], z['rcd'], z['rc']
     out = {}
     for q, sid in enumerate(ids):
         sl = slice(int(off[q]), int(off[q + 1]))
-        out[str(sid)] = {f: z[f][sl] for f in FIELDS}
-        out[str(sid)]['rc'] = (int(z['rcd'][q]), float(z['rc'][q]))
+        out[str(sid)] = {f: arr[f][sl] for f in FIELDS}
+        out[str(sid)]['rc'] = (int(rcd[q]), float(rcv[q]))
     print('cache loaded', p, len(out), 'stocks', flush=True)
     return out
 
