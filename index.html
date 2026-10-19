@@ -2458,7 +2458,7 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
       const st = el('div', 'cond-state'); st.append(el('span', 'mark', up ? '✓' : '×'), '在 10 日线' + (up ? '上方' : '下方'));
       const nums = el('div', 'cond-nums');
       const kv = (k2, v) => { const s = el('span'); s.append(k2 + ' ', el('b', null, v)); return s; };
-      nums.append(kv('收盘', fp(k, c)), kv('10日线', fp(k, ma)), kv('距离', pct(c / ma - 1)));
+      nums.append(kv(LIVEADDED.has(DATES[DL]) ? '现值' : '收盘', fp(k, c)), kv('10日线', fp(k, ma)), kv('距离', pct(c / ma - 1)));
       const foot = el('div', 'cond-foot'); foot.append(el('span', null, '已连续 ' + run + ' 个交易日在 10 日线' + (up ? '上' : '下')));
       a.append(top, el('div', 'cond-sub', m.sub), st, nums, spark(k, 40), foot);
       box.appendChild(a);
