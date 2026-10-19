@@ -496,7 +496,7 @@ body { background: transparent; position: relative; isolation: isolate; font-var
 /* light caught in the top-left of the glass */
 .card::after, .cond::after, .ds-hero::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: radial-gradient(110% 70% at 12% -8%, rgba(255, 255, 255, 0.16), transparent 52%);
+  background: radial-gradient(110% 70% at var(--lx, 12%) var(--ly, -8%), rgba(255, 255, 255, 0.16), transparent 52%);
 }
 .card { border-radius: 26px; padding: 18px 20px; }
 .cond, .rt-thermo { border-radius: 22px; }
@@ -505,7 +505,7 @@ body { background: transparent; position: relative; isolation: isolate; font-var
 .card > *, .cond > *, .ds-hero > * { position: relative; z-index: 1; }
 
 /* app bar: a floating glass strip */
-.appbar { background: rgba(10, 13, 30, 0.55); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 14px 40px -24px rgba(0, 0, 0, 0.9); }
+.appbar { position: sticky; background: rgba(10, 13, 30, 0.55); box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08), 0 14px 40px -24px rgba(0, 0, 0, 0.9); }
 body::before { background: rgba(10, 13, 30, 0.7); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); }
 .brand h1 { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.02em; }
 
@@ -604,6 +604,12 @@ body::before { background: rgba(10, 13, 30, 0.7); -webkit-backdrop-filter: var(-
 @media (min-width: 1000px) { #rt-conds { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
 @media (max-width: 999px) and (min-width: 341px) { #rt-conds > .cond:nth-child(5):last-child { grid-column: 1 / -1; } }
 .sk-name small { color: var(--muted); }
+
+/* the hero's rim picks up the color of its own light */
+.ds-hero::before { background: linear-gradient(140deg, color-mix(in srgb, var(--glow) 55%, #fff) 0%, rgba(255, 255, 255, 0.10) 30%, rgba(255, 255, 255, 0.03) 62%, color-mix(in srgb, var(--glow) 40%, rgba(255, 255, 255, 0.3)) 100%); }
+/* Chromium: the bar turns into a clear sheet and the tab capsule bends what scrolls beneath it */
+.lg-refract .appbar { background: linear-gradient(to bottom, rgba(5, 7, 15, 0.82), rgba(5, 7, 15, 0.35) 70%, rgba(5, 7, 15, 0)); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.lg-refract .tabs { background: linear-gradient(160deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.03)), rgba(12, 15, 34, 0.38); -webkit-backdrop-filter: url(#lg-tabs) blur(1.5px) saturate(170%) brightness(1.08); backdrop-filter: url(#lg-tabs) blur(1.5px) saturate(170%) brightness(1.08); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 1px rgba(255, 255, 255, 0.12), 0 10px 30px -12px rgba(0, 0, 0, 0.7); }
 
 </style>
 
@@ -2021,6 +2027,60 @@ body::before { background: rgba(10, 13, 30, 0.7); -webkit-backdrop-filter: var(-
       new MutationObserver(move).observe(tabs, { subtree: true, attributes: true, attributeFilter: ['aria-selected'] });
       addEventListener('resize', move); if (document.fonts && document.fonts.ready) document.fonts.ready.then(move);
       requestAnimationFrame(() => { ind.style.transition = 'none'; move(); requestAnimationFrame(() => { ind.style.transition = ''; }); });
+    }
+    // light moves across the glass: with the pointer on a desktop, with scrolling on a phone
+    const lit = '.card, .cond, .ds-hero';
+    const fine = matchMedia('(hover: hover) and (pointer: fine)').matches, still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!still) {
+      if (fine) {
+        let pend = null;
+        addEventListener('pointermove', e => { pend = e; requestAnimationFrame(() => { if (!pend) return; const t = pend.target.closest && pend.target.closest(lit); if (t) { const r = t.getBoundingClientRect(); t.style.setProperty('--lx', ((pend.clientX - r.left) / r.width * 100).toFixed(1) + '%'); t.style.setProperty('--ly', ((pend.clientY - r.top) / r.height * 100).toFixed(1) + '%'); } pend = null; }); }, { passive: true });
+      }
+      let ticking = false;
+      const sweep = () => { ticking = false; const H = innerHeight; document.querySelectorAll(lit).forEach(t => { if (fine && t.matches(':hover')) return; const r = t.getBoundingClientRect(); if (r.bottom < 0 || r.top > H) return; const f = Math.min(1, Math.max(0, (r.top + r.height / 2) / H)); t.style.setProperty('--lx', (8 + f * 30).toFixed(1) + '%'); t.style.setProperty('--ly', (-12 + f * 20).toFixed(1) + '%'); }); };
+      addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(sweep); } }, { passive: true });
+      sweep();
+    }
+    // real refraction where the browser can do it (Chromium): the tab capsule bends what scrolls beneath it.
+    // Safari and every browser on iPhone keep the frosted version.
+    const chromium = !!(navigator.userAgentData && navigator.userAgentData.brands && navigator.userAgentData.brands.some(b => /Chromium/.test(b.brand)));
+    if (chromium && tabs && !still) {
+      const NS = 'http://www.w3.org/2000/svg';
+      const svg = document.createElementNS(NS, 'svg'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('width', '0'); svg.setAttribute('height', '0'); svg.style.position = 'absolute';
+      document.body.appendChild(svg);
+      // displacement map for a rounded rect: pixels near the rim sample from further inside, like the curved edge of a lens
+      const lensMap = (w, h, r, bezel) => {
+        const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'), img = g.createImageData(w, h), d = img.data;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+          const px = x + 0.5 - w / 2, py = y + 0.5 - h / 2, qx = Math.abs(px) - (w / 2 - r), qy = Math.abs(py) - (h / 2 - r);
+          const lo = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)), inset = r - (lo + Math.min(Math.max(qx, qy), 0));
+          let dx = 0, dy = 0;
+          if (inset > 0 && inset < bezel) {
+            let nx, ny; if (qx > 0 && qy > 0) { nx = qx / lo; ny = qy / lo; } else if (qx > qy) { nx = 1; ny = 0; } else { nx = 0; ny = 1; }
+            nx *= px < 0 ? -1 : 1; ny *= py < 0 ? -1 : 1;
+            const t = 1 - inset / bezel, k = t * t * (3 - 2 * t);
+            dx = -nx * k; dy = -ny * k;
+          }
+          const i = (y * w + x) * 4; d[i] = 128 + dx * 127; d[i + 1] = 128 + dy * 127; d[i + 2] = 128; d[i + 3] = 255;
+        }
+        g.putImageData(img, 0, 0); return c.toDataURL();
+      };
+      const build = (el, id, scale) => {
+        const w = Math.round(el.offsetWidth), h = Math.round(el.offsetHeight); if (!w || !h) return;
+        const r = Math.min(h / 2, parseFloat(getComputedStyle(el).borderTopLeftRadius) || h / 2), map = lensMap(w, h, r, Math.min(h * 0.45, 22));
+        const disp = (sc, res) => '<feDisplacementMap in="SourceGraphic" in2="m" scale="' + sc + '" xChannelSelector="R" yChannelSelector="G" result="' + res + '"/>';
+        const only = (inp, row, res) => '<feColorMatrix in="' + inp + '" type="matrix" values="' + row + '" result="' + res + '"/>';
+        let f = svg.querySelector('#' + id); if (!f) { f = document.createElementNS(NS, 'filter'); f.id = id; svg.appendChild(f); }
+        f.setAttribute('x', '0'); f.setAttribute('y', '0'); f.setAttribute('width', w); f.setAttribute('height', h); f.setAttribute('filterUnits', 'userSpaceOnUse'); f.setAttribute('color-interpolation-filters', 'sRGB');
+        // three channels bent by slightly different amounts: the faint color fringe of real glass
+        f.innerHTML = '<feImage href="' + map + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="m"/>' +
+          disp(scale, 'dr') + disp(scale * 0.9, 'dg') + disp(scale * 0.8, 'db') +
+          only('dr', '1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0', 'r') + only('dg', '0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0', 'gg') + only('db', '0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0', 'b') +
+          '<feBlend in="r" in2="gg" mode="screen" result="rg"/><feBlend in="rg" in2="b" mode="screen"/>';
+      };
+      const go = () => { build(tabs, 'lg-tabs', 36); };
+      document.documentElement.classList.add('lg-refract');
+      go(); let rt = 0; new ResizeObserver(() => { clearTimeout(rt); rt = setTimeout(go, 150); }).observe(tabs);
     }
     // the verdict glass condenses once, the first time each view is shown
     const seen = new Set();
