@@ -741,7 +741,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     <p>顶背离：MACD 金叉到死叉算一段，相邻两段里后一段的最高价更高、DIF 最高点却更低，且 DIF 仍在零轴上方、两段相隔不超过 60 根K线，在后一段死叉当天确认。站上 MA5：超跌线（或 RSI12）最近 10 个交易日内到过 30 以下，当天收盘从下方站上 5 日线；周线版用最近 4 周、5 周线。套牢盘：近 250 个交易日每天的成交额平均摊在当天最高价和最低价之间，摊在现价上方的比例；升破 80% 在 20 天内只记一次，其余单次信号 10 天内只记一次。</p>
     <p>单次信号：信号出现后次日收盘进场，“上涨比例”是之后 20 / 60 个交易日收盘高于进场价的比例，“平时”是所有交易日的同一比例。创业板与上证以 2020 年为界、科创50 以 2023 年 7 月为界分成前后两段，只在一段成立的不算有效。</p>
     <p>持仓开关：信号次日收盘执行，不计手续费和滑点，对比同期买入并一直持有指数。RSRS：每天的最高价对最低价做 18 日回归取斜率，在 600 日窗口内标准化（科创50 历史太短，用 250 日），高于 +0.7 持有、低于 −0.7 空仓。乖离20 的超跌 / 过热阈值取各指数自身历史上最低 / 最高的 1.5%。</p>
-    <p>页面是 <span class="num" id="asof2">—</span> 收盘的静态快照，不会自动更新。历史统计不代表未来，不构成投资建议。图表库：<a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts</a>。</p>
+    <p>数据截至 <span class="num" id="asof2">—</span>。打开页面时会补上最新的交易日，交易时间里每 15 秒自动更新当天的 K 线；RSRS、套牢盘、两融这几项是每天收盘后算的，当天盘中沿用前一天的值。历史统计不代表未来，不构成投资建议。图表库：<a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts</a>。</p>
   </footer>
   </section>
 </div>
@@ -1479,10 +1479,24 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   }
   $('rt-refresh').addEventListener('click', () => refresh(true).then(schedule));
   document.addEventListener('visibilitychange', () => { if (!document.hidden && RT.visible && S.started) refresh(false).then(schedule); });
+  async function indexBars(secid, lmt) {
+    try { return (await emKlineEM(secid, lmt)).bars; } catch (e) {}
+    const k = await qqKline(secid, lmt);
+    k.bars.forEach(b => { b.a = NaN; });          // 腾讯 index rows carry no turnover; today's comes from the quote below
+    try { const q = (await emSnap([secid]))[secid]; const last = k.bars[k.bars.length - 1]; if (q && last && q.t === last.t) last.a = q.a; } catch (e) {}
+    return k.bars;
+  }
+  async function thsToday(code) {
+    const td = await ths('bk_' + code + '/01/today.js', 'quotebridge_v4_line_bk_' + code + '_01_today');
+    const q = td && td['bk_' + code];
+    return q && q['1'] && ok(+q['11']) ? { t: ymd(q['1']), o: +q['7'], h: +q['8'], l: +q['9'], c: +q['11'], v: +q['13'], a: +q['19'] } : null;
+  }
   const RT = window.RT = {
+    session, today: () => bj().date, indexBars, thsToday, snap: emSnap, thsDaily: code => thsDaily(code).then(d => d.bars),
     visible: false,
-    onShow() { RT.visible = true; const bd = document.querySelector('.brand-date'); if (bd) { if (RT.bd == null) RT.bd = bd.innerHTML; bd.textContent = '实时行情 · 北京时间'; } if (!S.started) { S.started = true; renderWatch(); renderScan(); refresh(true).then(schedule); } else { schedule(); } },
-    onHide() { RT.visible = false; const bd = document.querySelector('.brand-date'); if (bd && RT.bd != null) bd.innerHTML = RT.bd; },
+    onShow() { RT.visible = true; RT.brand(true); if (!S.started) { S.started = true; renderWatch(); renderScan(); refresh(true).then(schedule); } else { schedule(); } },
+    onHide() { RT.visible = false; RT.brand(false); },
+    brand(on) { const bd = document.querySelector('.brand-date'); if (!bd) return; let x = document.getElementById('brand-rt'); if (!x) { x = document.createElement('span'); x.id = 'brand-rt'; x.className = 'brand-date'; x.textContent = '实时行情 · 北京时间'; bd.after(x); } bd.hidden = on; x.hidden = !on; },
     theme() { paintChart(); }
   };
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => RT.theme()); } catch (e) {}
@@ -1636,8 +1650,8 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
   // ---------- dates ----------
   const DATES = [D0];
   { let t = Date.parse(D0 + 'T00:00:00Z'); for (const g of GAPS.split(',')) { t += Number(g) * 86400000; DATES.push(new Date(t).toISOString().slice(0, 10)); } }
-  const W0 = 60, ND = DATES.length - W0, T = DATES.slice(W0);
-  const LAST = ND - 1;
+  const W0 = 60, T = DATES.slice(W0);
+  let ND = DATES.length - W0, LAST = ND - 1;
   const TIDX = new Map(T.map((t, i) => [t, i]));
   const YEAR = T[LAST].slice(0, 4);
 
@@ -2404,7 +2418,7 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
     return { C: ci.map(v => v / sc), O: off(x.o), H: off(x.h), L: off(x.l), A: numL(x.a), sd: x.sd };
   }
   const DD = { A: decodeDS(DS.A), Y: decodeDS(DS.Y), H: decodeDS(DS.H), sh: { C: IX.sh.c.map(v => v / 100) } };
-  const NALL = DATES.length, DL = NALL - 1;
+  let NALL = DATES.length, DL = NALL - 1;
   const M10 = {}, UP = {};
   ['A', 'Y', 'H', 'sh'].forEach(k => { M10[k] = sma(DD[k].C, 10); UP[k] = DD[k].C.map((c, i) => i >= 9 ? c > M10[k][i] : null); });
   const FS = DATES.map((_, i) => i >= 9 ? !!(UP.A[i] && UP.Y[i] && UP.H[i]) : null);
@@ -2418,7 +2432,7 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
   function fillDsHero() {
     const f = FS[DL], run = runLen(FS, DL), nUp = ['A', 'Y', 'H'].filter(k => UP[k][DL]).length;
     const b = $('ds-badge'); b.textContent = f ? '大势符合' : '大势不符合'; b.className = 'v-badge ' + (f ? 'ok' : 'no');
-    $('ds-date').textContent = DATES[DL] + ' 周' + wdN(DATES[DL]) + ' 收盘';
+    $('ds-date').textContent = DATES[DL] + ' 周' + wdN(DATES[DL]) + (LIVEADDED.has(DATES[DL]) ? ' 盘中实时' : ' 收盘');
     $('ds-sum').textContent = f
       ? '三条线都在 10 日线上方，已连续 ' + run + ' 个交易日。按这套顺序，接着复盘板块和个股：个股在 5 日线上、符合极限量，才算买点。'
       : (nUp === 0 ? '三条线全部' : '三条线里有 ' + (3 - nUp) + ' 条') + '在 10 日线下方，按这套顺序，今天的复盘到这里结束。已连续 ' + run + ' 个交易日不符合' + (lastF >= 0 ? '，上一次三条线同时站上是 ' + cn(DATES[lastF]) + '。' : '。');
@@ -2762,6 +2776,105 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
   }
 
   // ---------- wiring for both views ----------
+
+  // ---------- live: bring the index pages up to the latest trading day ----------
+  // Embedded data stops at the day the page was built. On load the newer days are fetched and appended;
+  // while the market is open, today's bar is refreshed from one quote request per source.
+  // RSRS (z), 套牢盘 (p), turnover trap (tr) and 两融 are end-of-day series: new days carry the previous value.
+  const LIVEADDED = new Set();
+  const LIVE_ID = { cyb: '0.399006', kc50: '1.000688', sh: '1.000001' };
+  const LIVE_TH = { A: '883957', Y: '883902', H: '883910' };
+  const WMSNAP = {};
+  let liveBusy = false, liveFull = false;
+  const ymdN = s => s.replace(/-/g, '');
+  function wmRebuild(k) {
+    // weekly / monthly bars of the index pages: rebuild their tail from the snapshot plus the live days
+    const e = EX[k];
+    if (!WMSNAP[k]) {
+      const wt = [e.w0]; { let t = Date.parse(e.w0 + 'T00:00:00Z'); for (const g of e.wg.split(',')) { t += Number(g) * 86400000; wt.push(new Date(t).toISOString().slice(0, 10)); } }
+      WMSNAP[k] = { wt, w: ['wo', 'wh', 'wl', 'wc', 'wa'].map(f => e[f].slice()), m: ['mo', 'mh', 'ml', 'mc', 'ma'].map(f => e[f].slice()) };
+    }
+    const sn = WMSNAP[k], wt = sn.wt.slice(), W = sn.w.map(a => a.slice()), M = sn.m.map(a => a.slice());
+    const [y0, m0] = e.m0.split('-').map(Number), mLab = i => { const mm = m0 - 1 + i; return (y0 + Math.floor(mm / 12)) + '-' + String(mm % 12 + 1).padStart(2, '0'); };
+    [...LIVEADDED].sort().forEach(d => {
+      const i = DATES.indexOf(d), r = IX[k]; if (i < 0) return;
+      const b = [r.o[i] / 10, r.h[i] / 10, r.l[i] / 10, r.c[i] / 10, r.a[i]];
+      const lw = W[3].length - 1;
+      if (wkKey(wt[lw]) === wkKey(d)) { W[1][lw] = Math.max(W[1][lw], b[1]); W[2][lw] = Math.min(W[2][lw], b[2]); W[3][lw] = b[3]; W[4][lw] += ok(b[4]) ? b[4] : 0; wt[lw] = d; }
+      else { [0, 1, 2, 3, 4].forEach(j => W[j].push(b[j])); wt.push(d); }
+      const lm = M[3].length - 1;
+      if (mLab(lm) === d.slice(0, 7)) { M[1][lm] = Math.max(M[1][lm], b[1]); M[2][lm] = Math.min(M[2][lm], b[2]); M[3][lm] = b[3]; M[4][lm] += ok(b[4]) ? b[4] : 0; }
+      else { [0, 1, 2, 3, 4].forEach(j => M[j].push(b[j])); }
+    });
+    ['wo', 'wh', 'wl', 'wc', 'wa'].forEach((f, j) => { e[f] = W[j]; });
+    ['mo', 'mh', 'ml', 'mc', 'ma'].forEach((f, j) => { e[f] = M[j]; });
+    e.wg = wt.slice(1).map((t, i) => Math.round((Date.parse(t + 'T00:00:00Z') - Date.parse(wt[i] + 'T00:00:00Z')) / 86400000)).join(',');
+  }
+  function liveApply(got) {
+    // got: { cyb|kc50|sh: [bars], A|Y|H: [bars] }, bars {t,o,h,l,c,a(元)}
+    const cal = (got.sh || []).map(b => b.t).filter(d => d >= DATES[DATES.length - 1]).sort();
+    let changed = false;
+    for (const d of cal) {
+      let i = DATES.indexOf(d); const isNew = i < 0;
+      if (!isNew && !LIVEADDED.has(d)) continue;          // never rewrite the days built into the page
+      if (isNew) { DATES.push(d); LIVEADDED.add(d); i = DATES.length - 1; }
+      for (const k of Object.keys(LIVE_ID)) {
+        const r = IX[k], b = (got[k] || []).find(x => x.t === d), pc = r.c[i - 1];
+        const vals = b ? [Math.round(b.o * 100), Math.round(b.h * 100), Math.round(b.l * 100), Math.round(b.c * 100), ok(b.a) ? b.a / 1e8 : NaN] : [pc, pc, pc, pc, NaN];
+        ['o', 'h', 'l', 'c', 'a'].forEach((f, j) => { if (isNew) r[f].push(vals[j]); else r[f][i] = vals[j]; });
+        if (isNew) { r.z.push(r.z[r.z.length - 1]); r.p.push(r.p[r.p.length - 1]); EX[k].tr.push(EX[k].tr[EX[k].tr.length - 1]); }
+      }
+      for (const k of Object.keys(LIVE_TH)) {
+        const dd = DD[k], b = (got[k] || []).find(x => x.t === d), pc = dd.C[i - 1];
+        const vals = b ? [b.o, b.h, b.l, b.c, b.a / 1e8] : [pc, pc, pc, pc, NaN];
+        ['O', 'H', 'L', 'C', 'A'].forEach((f, j) => { if (isNew) dd[f].push(vals[j]); else dd[f][i] = vals[j]; });
+      }
+      if (isNew) { RZ.r.push(null); ZR.push(NaN); }
+      changed = true;
+    }
+    if (changed) { Object.keys(LIVE_ID).forEach(wmRebuild); liveRecompute(); }
+    return changed;
+  }
+  function liveRecompute() {
+    ND = DATES.length - W0; LAST = ND - 1; NALL = DATES.length; DL = NALL - 1;
+    T.length = 0; DATES.slice(W0).forEach(x => T.push(x)); TIDX.clear(); T.forEach((t, i) => TIDX.set(t, i));
+    D.cyb = build('cyb'); D.kc50 = build('kc50'); D.sh = build('sh');
+    Object.keys(VIEWS).forEach(k => delete VIEWS[k]); Object.keys(DSV).forEach(k => delete DSV[k]);
+    DD.sh = { C: IX.sh.c.map(v => v / 100) };
+    ['A', 'Y', 'H', 'sh'].forEach(k => { M10[k] = sma(DD[k].C, 10); UP[k] = DD[k].C.map((c, i) => i >= 9 ? c > M10[k][i] : null); });
+    FS.length = 0; DATES.forEach((_, i) => FS.push(i >= 9 ? !!(UP.A[i] && UP.Y[i] && UP.H[i]) : null));
+    YR.length = 0; DD.Y.C.forEach((c, i) => YR.push(i ? c / DD.Y.C[i - 1] - 1 : NaN));
+    lastF = -1; for (let i = DL; i >= 9; i--) if (FS[i]) { lastF = i; break; }
+    const tag = LIVEADDED.has(T[LAST]) && window.RT && (RT.session() === 'open' || RT.session() === 'noon') ? T[LAST] + ' 盘中' : T[LAST];
+    ['asof', 'asof2', 'asof-top', 'asof3'].forEach(id => { const e = $(id); if (e) e.textContent = tag; });
+    try { buildPicker(); fillNow(); fillReport(); fillVol(); fillRecent(); rerender(); } catch (e) { console.warn('live tj', e); }
+    try { fillDsHero(); fillConds(); drawPL(); fillDsTable(); dsRerender(); } catch (e) { console.warn('live ds', e); }
+  }
+  async function liveTick(full) {
+    if (liveBusy || !window.RT || !RT.indexBars) return; liveBusy = true;
+    try {
+      const got = {};
+      if (full || !liveFull) {
+        for (const k of Object.keys(LIVE_ID)) got[k] = await RT.indexBars(LIVE_ID[k], 15).catch(() => []);
+        for (const k of Object.keys(LIVE_TH)) got[k] = await RT.thsDaily(LIVE_TH[k]).then(b => b.slice(-15)).catch(() => []);
+        if ((got.sh || []).length) liveFull = true;
+      } else {
+        const q = await RT.snap(Object.values(LIVE_ID)).catch(() => ({}));
+        for (const k of Object.keys(LIVE_ID)) { const x = q[LIVE_ID[k]]; const t = x && (x.t || (RT.session() === 'open' || RT.session() === 'noon' ? RT.today() : null)); got[k] = x && t ? [Object.assign({}, x, { t })] : []; }
+        for (const k of Object.keys(LIVE_TH)) { const b = await RT.thsToday(LIVE_TH[k]).catch(() => null); got[k] = b ? [b] : []; }
+      }
+      liveApply(got);
+    } catch (e) { console.warn('live', e); }
+    liveBusy = false;
+  }
+  let liveTimer = 0;
+  function liveSchedule() {
+    clearTimeout(liveTimer);
+    liveTimer = setTimeout(async () => {
+      if (window.RT && RT.session() === 'open' && !document.hidden && curView !== 'rt') await liveTick(false);
+      liveSchedule();
+    }, 15000);
+  }
   function theme() { paintChart(); rerender(); paintRz(); paintDs(); dsRerender(); paintEq(); }
   ['asof', 'asof2', 'asof-top', 'asof3'].forEach(id => { const e = $(id); if (e) e.textContent = T[LAST]; });
   { const s = store.get('ztj-index'); if (s && D[s]) cur = s; }
@@ -2809,6 +2922,8 @@ Af: "1000,1000,987,987,964,980,975,974,974,974,972,972,972,972,972,972,972,980,9
   Object.entries(VW).forEach(([k, [tab]]) => tab.addEventListener('click', () => { if (k !== curView) { setView(k); window.scrollTo(0, 0); } }));
   $('tab-ds').parentElement.addEventListener('keydown', e => { if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return; const ks = Object.keys(VW), nv = ks[(ks.indexOf(curView) + (e.key === 'ArrowRight' ? 1 : ks.length - 1)) % ks.length]; setView(nv); VW[nv][0].focus(); });
   { let v0 = (location.hash || '').replace('#', ''); if (!VW[v0]) v0 = store.get('ztj-view2'); if (!VW[v0]) v0 = 'rt'; setView(v0); }
+  setTimeout(() => { liveTick(true).then(liveSchedule); }, 300);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && curView !== 'rt') liveTick(false); });
   if (window.ResizeObserver) {
     let raf = 0;
     new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => {
