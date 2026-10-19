@@ -429,6 +429,118 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .band-btn i { width: 12px; height: 12px; border-radius: 3px; }
 .legend i.bar { width: 14px; height: 10px; border-radius: 2px; }
 
+.ichart { width: 100%; height: clamp(380px, 52vh, 520px); }
+@media (max-width: 560px) { .ichart { height: 400px; } }
+.legend i { vertical-align: middle; }
+.sk.hld { border-color: color-mix(in srgb, var(--up) 25%, var(--line)); }
+.st-chip, .kind-chip { font-size: 12px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; font-weight: 600; }
+.st-chip.buy { color: #fff; background: var(--up); }
+.st-chip.hold { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+.st-chip.no { color: var(--muted); background: var(--chip); font-weight: 500; }
+.kind-chip { font-weight: 500; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); }
+
+/* ================= glass layer: frosted surfaces over a slowly moving color field ================= */
+:root {
+  --field-a: #8fb4ff; --field-b: #ffb3c1; --field-c: #9fe6d4; --field-d: #ffd59a;
+  --g-bg: rgba(255, 255, 255, 0.58); --g-bg-strong: rgba(255, 255, 255, 0.74); --g-line: rgba(255, 255, 255, 0.75); --g-edge: rgba(20, 30, 50, 0.08);
+  --g-hi: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(255, 255, 255, 0.25);
+  --g-shadow: 0 1px 1px rgba(20, 30, 50, 0.04), 0 10px 30px -8px rgba(30, 45, 80, 0.18);
+  --g-blur: saturate(170%) blur(22px);
+  --spring: cubic-bezier(0.34, 1.4, 0.5, 1);
+  --sk-bg: rgba(255, 255, 255, 0.66);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --field-a: #1f3f8f; --field-b: #6b2348; --field-c: #0f5a55; --field-d: #5a3d10;
+    --g-bg: rgba(22, 30, 42, 0.52); --g-bg-strong: rgba(22, 30, 42, 0.7); --g-line: rgba(255, 255, 255, 0.10); --g-edge: rgba(0, 0, 0, 0.35);
+    --g-hi: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+    --g-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 12px 34px -10px rgba(0, 0, 0, 0.6);
+    --sk-bg: rgba(24, 32, 44, 0.6);
+  }
+}
+:root[data-theme="dark"] {
+  --field-a: #1f3f8f; --field-b: #6b2348; --field-c: #0f5a55; --field-d: #5a3d10;
+  --g-bg: rgba(22, 30, 42, 0.52); --g-bg-strong: rgba(22, 30, 42, 0.7); --g-line: rgba(255, 255, 255, 0.10); --g-edge: rgba(0, 0, 0, 0.35);
+  --g-hi: inset 0 1px 0 rgba(255, 255, 255, 0.10), inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+  --g-shadow: 0 1px 1px rgba(0, 0, 0, 0.3), 0 12px 34px -10px rgba(0, 0, 0, 0.6);
+  --sk-bg: rgba(24, 32, 44, 0.6);
+}
+html { background: var(--bg); }
+body { background: transparent; position: relative; isolation: isolate; }
+/* the color field: soft radial blobs drifting slowly (transform only, cheap on phones) */
+.glass-field { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--bg); }
+.glass-field i { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; opacity: .55; will-change: transform; }
+.glass-field i:nth-child(1) { left: -20vmax; top: -25vmax; background: radial-gradient(circle at center, var(--field-a), transparent 62%); animation: gf1 38s ease-in-out infinite alternate; }
+.glass-field i:nth-child(2) { right: -25vmax; top: -10vmax; background: radial-gradient(circle at center, var(--field-b), transparent 62%); animation: gf2 46s ease-in-out infinite alternate; }
+.glass-field i:nth-child(3) { left: 10vmax; bottom: -35vmax; background: radial-gradient(circle at center, var(--field-c), transparent 62%); animation: gf3 52s ease-in-out infinite alternate; }
+.glass-field i:nth-child(4) { right: -15vmax; bottom: -30vmax; background: radial-gradient(circle at center, var(--field-d), transparent 60%); animation: gf1 60s ease-in-out infinite alternate-reverse; opacity: .4; }
+@keyframes gf1 { to { transform: translate3d(14vmax, 10vmax, 0) scale(1.12); } }
+@keyframes gf2 { to { transform: translate3d(-12vmax, 14vmax, 0) scale(0.92); } }
+@keyframes gf3 { to { transform: translate3d(10vmax, -12vmax, 0) scale(1.08); } }
+
+/* frosted surfaces */
+.appbar, .card, .cond, .rt-thermo, .ds-hero, .tabs {
+  background: var(--g-bg); border-color: var(--g-line);
+  -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur);
+  box-shadow: var(--g-hi), var(--g-shadow);
+}
+.appbar { background: var(--g-bg-strong); border-bottom: 1px solid var(--g-line); box-shadow: var(--g-hi), 0 6px 24px -12px rgba(20, 30, 60, .25); }
+body::before { background: var(--g-bg-strong); -webkit-backdrop-filter: var(--g-blur); backdrop-filter: var(--g-blur); }
+.card, .cond, .rt-thermo { border: 1px solid var(--g-line); border-radius: 18px; position: relative; }
+.card { padding: 16px 18px; }
+.ds-hero { border: 1px solid var(--g-line); border-radius: 22px; padding: 18px 20px; position: relative; overflow: hidden; }
+/* a specular sheen along the top edge, like light caught in glass */
+.card::after, .ds-hero::after, .cond::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .55) 0%, rgba(255, 255, 255, 0) 28%, rgba(255, 255, 255, 0) 72%, rgba(255, 255, 255, .12) 100%);
+  mix-blend-mode: soft-light; opacity: .9;
+}
+.tabs { border: 1px solid var(--g-line); border-radius: 14px; padding: 4px; position: relative; }
+.tabs button { position: relative; z-index: 1; border-radius: 10px; transition: color .25s ease; }
+.tabs.has-ind button[aria-selected="true"] { background: transparent; box-shadow: none; }
+.tab-ind { position: absolute; top: 4px; bottom: 4px; left: 0; width: 0; border-radius: 10px; z-index: 0; pointer-events: none;
+  background: var(--panel); box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 4px 14px -4px rgba(30, 45, 80, .3), inset 0 1px 0 rgba(255, 255, 255, .7);
+  transition: transform .45s var(--spring), width .45s var(--spring); }
+/* charts keep a solid background so lines stay crisp */
+.chart-box { background: var(--panel); border-radius: 12px; overflow: hidden; }
+/* stock cards: translucent, no blur (there can be a hundred of them) */
+.sk { background: var(--sk-bg); border-color: var(--g-line); border-radius: 14px; box-shadow: var(--g-hi); transition: transform .2s var(--spring), box-shadow .2s ease, border-color .2s ease; }
+.sk:hover { transform: translateY(-2px); box-shadow: var(--g-hi), var(--g-shadow); }
+.sk.okk { border-color: color-mix(in srgb, var(--up) 45%, var(--g-line)); }
+.ghost, .seg, .mk, .star, .rt-search input, .rt-day input[type="date"] { background: var(--sk-bg); border-color: var(--g-line); }
+.ghost, .seg button, .mk, .star, .tabs button, .sk { -webkit-tap-highlight-color: transparent; }
+.ghost, .mk, .star, .seg button, .tabs button { transition: transform .18s var(--spring), background-color .2s ease, color .2s ease; }
+.ghost:active, .mk:active, .star:active, .seg button:active, .tabs button:active { transform: scale(.95); }
+.sk:active { transform: scale(.985); }
+.v-badge { transition: color .5s ease; }
+.rt-gate { transition: background-color .4s ease, color .4s ease; border-radius: 12px; }
+/* entrance: cards float up once, the first time a view is shown */
+.view.enter .card, .view.enter .ds-hero, .view.enter .cond, .view.enter .conds-wrap, .view.enter .rt-thermo { animation: rise .6s var(--spring) both; animation-delay: calc(var(--i, 0) * 45ms); }
+@keyframes rise { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); } to { opacity: 1; transform: none; } }
+/* numbers that change on a refresh glow briefly */
+.flash-up { animation: flashUp 1.2s ease-out; } .flash-down { animation: flashDn 1.2s ease-out; }
+@keyframes flashUp { 0% { background: color-mix(in srgb, var(--up) 28%, transparent); } 100% { background: transparent; } }
+@keyframes flashDn { 0% { background: color-mix(in srgb, var(--down) 28%, transparent); } 100% { background: transparent; } }
+.cond-nums b, .sk-px, .rt-d-head .big { border-radius: 4px; }
+/* live dot next to the time while the market is open */
+.live-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--up); margin-right: 6px; vertical-align: 1px; box-shadow: 0 0 0 0 color-mix(in srgb, var(--up) 60%, transparent); animation: pulse 2s ease-out infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--up) 55%, transparent); } 100% { box-shadow: 0 0 0 9px transparent; } }
+/* no backdrop-filter support: solid panels */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .appbar, .card, .cond, .rt-thermo, .ds-hero, .tabs { background: var(--panel); }
+}
+@media (max-width: 560px) {
+  .card { padding: 14px 14px; border-radius: 16px; }
+  .ds-hero { padding: 16px 14px; border-radius: 18px; }
+  .glass-field i { opacity: .45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass-field i, .live-dot { animation: none; }
+  .view.enter .card, .view.enter .ds-hero, .view.enter .cond, .view.enter .conds-wrap, .view.enter .rt-thermo { animation: none; }
+  .tab-ind, .sk, .ghost, .mk, .star, .seg button, .tabs button { transition: none; }
+  .flash-up, .flash-down { animation: none; }
+}
+
 </style>
 
 <header class="appbar">
@@ -457,9 +569,24 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 
     <div class="conds-wrap">
       <div class="conds" id="rt-conds"></div>
-      <p class="cap">三条线都在 10 日线上方才算大势符合。成交额卡片看的是沪深京三市合计（同花顺全A 的成交额）。</p>
+      <p class="cap">非科技股看前三条线：都在 10 日线上方才算大势符合。科技股看「科技闸门」（科创50、创业板指）。成交额卡片看的是沪深京三市合计（同花顺全A 的成交额）。</p>
     </div>
     <div class="rt-thermo" id="rt-thermo"></div>
+
+    <section class="card" aria-labelledby="rt-i-title">
+      <div class="card-head"><h2 id="rt-i-title" class="h-card">盘中走势</h2><span class="cap">分时看当天怎么走；30 / 60 分钟看小级别的超跌和企稳</span></div>
+      <div class="chart-bar">
+        <span class="seg" id="rt-i-sym" role="group" aria-label="选择指数">
+          <button type="button" data-k="A">全A</button><button type="button" data-k="Y">昨成交</button><button type="button" data-k="H">热股</button><button type="button" data-k="sh">上证</button><button type="button" data-k="kc50">科创50</button><button type="button" data-k="cyb">创业板指</button>
+        </span>
+        <span class="seg tf" id="rt-i-tf" role="group" aria-label="周期">
+          <button type="button" data-m="fs">分时</button><button type="button" data-m="30">30分</button><button type="button" data-m="60">60分</button>
+        </span>
+      </div>
+      <div class="chart-box"><div id="rt-i-chart" class="ichart"></div></div>
+      <div class="legend" id="rt-i-legend"></div>
+      <p class="cap" id="rt-i-err"></p>
+    </section>
 
     <section class="card" aria-labelledby="rt-w-title">
       <div class="card-head"><h2 id="rt-w-title" class="h-card">自选与卖出信号</h2><span class="rt-actions"><button type="button" class="ghost" id="rt-io-btn" aria-expanded="false" aria-controls="rt-io">导入 / 导出</button></span></div>
@@ -483,14 +610,16 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       </div>
       <div class="rt-d-head" id="rt-d-head"></div>
       <div class="rt-d-checks" id="rt-d-checks"></div>
-      <div class="marks"><button type="button" class="mk band-btn" id="rt-band" aria-pressed="true" style="--c: var(--up)"><i></i>符合 / 不符合区间</button><span class="cap">红色底色是这只股票当天符合选股条件，绿色底色是不符合。</span></div>
+      <div class="chart-bar"><span class="seg tf" id="rt-d-tf" role="group" aria-label="周期"><button type="button" data-m="D" aria-pressed="true">日K</button><button type="button" data-m="fs">分时</button><button type="button" data-m="30">30分</button><button type="button" data-m="60">60分</button></span></div>
+      <div class="marks" id="rt-band-row"><button type="button" class="mk band-btn" id="rt-band" aria-pressed="true" style="--c: var(--up)"><i></i>符合 / 不符合区间</button><span class="cap">深红是买点，浅红是还在主升里（可以拿着），绿色是不符合。</span></div>
       <div class="hover" id="rt-d-hover"></div>
-      <div class="chart-box"><div id="rtchart"></div></div>
+      <div class="chart-box"><div id="rtchart"></div><div id="rt-di-chart" class="ichart" hidden></div></div>
       <div class="legend" id="rt-d-legend"></div>
+      <div class="legend" id="rt-di-legend" hidden></div>
     </section>
 
     <section class="card" aria-labelledby="rt-s-title">
-      <div class="card-head"><h2 id="rt-s-title" class="h-card">今天符合条件的个股</h2><span class="pl-stats" id="rt-s-stats"></span></div>
+      <div class="card-head"><h2 id="rt-s-title" class="h-card">今天的买点和主升股</h2><span class="pl-stats" id="rt-s-stats"></span></div>
       <p class="rt-gate" id="rt-gate"></p>
       <div class="rt-day">
         <span class="seg-label">日期</span>
@@ -502,7 +631,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       </div>
       <div class="rt-filter">
         <span class="seg" id="rt-s-mode" role="group" aria-label="显示范围">
-          <button type="button" data-m="ok" aria-pressed="true">符合条件</button>
+          <button type="button" data-m="ok" aria-pressed="true">买点 + 主升持有</button>
+          <button type="button" data-m="buy" aria-pressed="false">只看买点</button>
           <button type="button" data-m="near" aria-pressed="false">差一条</button>
           <button type="button" data-m="all" aria-pressed="false">全部候选</button>
         </span>
@@ -511,14 +641,15 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       <details class="rt-rules">
         <summary>选股和卖出规则怎么来的</summary>
         <div class="notes">
-          <p><b>候选池</b>：当天成交额前 200 的股票，去掉 ST 和上市不足 60 个交易日的。原规则是"钱在哪，机会就在哪"，先看成交前排。</p>
-          <p><b>必须满足</b>（全部满足才算符合条件）：收盘价在 5 日线上方；5 日线向上；离 5 日线不超过 8%（原规则说乖离太大不低吸，没给数字，8% 是取的中间值）；当天没有跌停（原规则：低吸从来不吸跌停）；最近 5 天的平均成交量比之前 20 天多两成以上，也就是在堆量。</p>
-          <p><b>还要满足其中之一</b>：离 60 日最高价不到 3%（原规则：尽量选新高或阶段新高的股，阻力小）；或者今天出现了下面任一个买点。</p>
-          <p><b>买点</b>：放量重新站上 5 日线（前一天还在 5 日线下，今天站上，成交量至少是前一天的 1.5 倍；原规则说倍量是强度验证，不必死扣翻倍）；回踩 5 日线或 10 日线（均线多头排列，当天最低价碰到均线附近 1% 以内，收盘守住）；收盘创 60 日新高。</p>
-          <p><b>加分项</b>：极限量，最近 5 天的平均成交量是近两年里最大的一段（原规则：极限量是一段时间的堆量，不是单日爆量）；20 日涨幅在候选池前 50（原规则：成交额和涨幅靠前的一起拿）。</p>
-          <p><b>大势和量能是前提</b>：三条线没有都站上 10 日线，或者两市成交额不到 2 万亿，按原规则当天不选股，下面的表只当观察用。成交额 2 万亿到 2.5 万亿之间只算局部机会，不重仓。</p>
-          <p><b>卖出</b>：收盘跌破 5 日线就出；跌破后第二天还收不回 5 日线，更要出。警示：三个交易日没有刷新 20 日新高；10 天内涨 7% 以上的大阳线，现在回吐到它实体的一半以下；当天跌停。</p>
-          <p>这些是按原规则写成的机械条件，原规则里"主线""中军""辨识度""分歧"这些需要人判断的部分没有放进来。只是个人复盘工具，不构成投资建议。</p>
+          <p><b>先分两种状态。</b>原规则里「拿着」和「买进」是两套标准：主升里的股票只要趋势不破就一直拿，不需要每天都出买点。所以这里分成「主升持有」和「买点」，两种都算符合。</p>
+          <p><b>主升持有（四条都满足）</b>：收盘不跌破 5 日线（盘中破了收回来不算有效跌破）；三个交易日内刷新过阶段新高（20 日新高）；量能堆着（最近 10 天的平均成交额不低于 60 天平均，和前期比，不是和昨天比）；20 日线向上、5 日线在 20 日线上方。原话的意思是：向下不破位，向上能新高，量能能堆起来，分时怎么走都随它。机构趋势股常常不涨停、涨不停，所以这里不要求天天放量，也不设乖离上限（原规则说乖离不用精算，乖离大了是等均线跟上来）。</p>
+          <p><b>买点（任一个，且收盘在 5 日线上、没跌停）</b>：爆发日——放量大阳（主板 5%、20cm 7% 以上，成交额是前 5 天均值的 1.5 倍），突破 20 日收盘高点或从 5 日线下翻上来，收在高位，原规则说爆发日追高不叫追；分歧低吸——昨天还在主升里，今天不涨（≤2%），回踩到 5 日线或 10 日线附近，收盘守住 10 日线；反包——前一天跌 3% 以上的阴线，今天收回它的开盘价；放量站上 5 日线；放量新高——整理两天以上后再创 60 日收盘新高，成交额比前 5 天多两成（缩量过前高不算）。</p>
+          <p><b>科技和非科技分开看大势。</b>科技股（科创板，或电子/通信、软件行业，以及创业板的专用设备、仪器仪表）看科创50 和创业板指：在 10 日线上方算共振，只在 5 日线上方算最低要求。原规则说科技只看自己的指数和板块，全A 只要止跌就行，全A 和科创是跷跷板。其他股票还是看同花顺全A、昨日成交前十、热股三条线。两市成交额照旧：2 万亿以下休息，2.5 万亿以上容量票可以重仓，接近 3 万亿是主线走得出来的量。</p>
+          <p><b>相对强弱（加分）</b>：强于指数——20 日涨幅跑赢自己那条指数（科技比科创50，其他比上证）；指数跌它抗跌——最近 10 天里有指数跌 1% 以上而它红盘或只跌 0.5% 以内的日子，现在还在 5 日线上（抗跌之后还要能穿越，不能补跌）；率先新高——指数还没回到高点，它先创了 60 日新高。</p>
+          <p><b>其他加分</b>：极限量（5 日均量创近两年最大，是一段时间的堆量，不是单日爆量）；大马拉小车（成交额前 100 里换手率排前三成，大成交配小流通）；主线板块（成交额前 40 里同一行业有 3 只以上，并且数量排前两位）；20 日涨幅在候选池前 50。</p>
+          <p><b>卖出</b>：收盘跌破 5 日线就出；跌破后第二天还收不回，更要出。警示：三个交易日没刷新阶段新高；高位（20 日涨 30% 以上）两天没新高，先做减法；10 天内 7% 以上的大阳线回吐到一半以下；跌停；指数大涨 1.5% 以上它却下跌（指数大涨你不涨，指数调整你只会更弱）；缩量过前高；放量滞涨。</p>
+          <p><b>候选池</b>：当天成交额前 200 的股票，去掉 ST 和上市不足 64 个交易日的。原规则是成交额第一，钱在哪机会就在哪。</p>
+          <p>原规则里需要人判断的部分没有放进来：哪个是中军、辨识度、分歧的质量、情绪周期、外盘（费城半导体、美光）、股指期货、监管和偏离值。只是个人复盘工具，不构成投资建议。</p>
         </div>
       </details>
     </section>
@@ -806,7 +937,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       window[cbName] = d => { done(); resolve(d); };
       s.onerror = () => { done(); reject(new Error('加载失败')); };
       s.referrerPolicy = 'no-referrer';
-      s.src = 'https://d.10jqka.com.cn/v4/line/' + path + '?_=' + Date.now();
+      s.src = 'https://d.10jqka.com.cn/' + (/^v\d\//.test(path) ? path : 'v4/line/' + path) + '?_=' + Date.now();
       document.head.appendChild(s);
     });
     const p = (thsChain[cbName] || Promise.resolve()).then(run, run);
@@ -938,60 +1069,115 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   }
 
   // ---------- rule engine ----------
+  // ==== ENGINE START ====
   const limitOf = (code, name) => (/ST/.test(name || '') ? 0.05 : /^(688|689|300|301)/.test(code) ? 0.2 : /^(8|4|92)/.test(code) ? 0.3 : 0.1);
-  function prep(b) {
-    const n = b.length, C = b.map(x => x.c), V = b.map(x => x.v), H = b.map(x => x.h);
-    const ma = k => { const out = new Array(n).fill(NaN); let s = 0; for (let i = 0; i < n; i++) { s += C[i]; if (i >= k) s -= C[i - k]; if (i >= k - 1) out[i] = s / k; } return out; };
-    const m5 = ma(5), m10 = ma(10), m20 = ma(20);
-    const v5 = new Array(n).fill(NaN); for (let i = 4; i < n; i++) v5[i] = (V[i] + V[i - 1] + V[i - 2] + V[i - 3] + V[i - 4]) / 5;
+  // 科技：科创板，或者证监会行业是电子/通信（C39）、软件和信息技术服务（I63–I65）；创业板里的专用设备、仪器仪表也算
+  const isTech = (code, ind) => /^(688|689)/.test(code) || /^(C39|I63|I64|I65)/.test(ind || '') || (/^(300|301)/.test(code) && /^(C35|C40)/.test(ind || ''));
+  // b: bars {t,o,h,l,c,v}; IX: Map date -> close of the stock's own gate index (科技用科创50/创业板指，其余用上证)
+  function prep(b, IX) {
+    const n = b.length, C = b.map(x => x.c), V = b.map(x => x.v), H = b.map(x => x.h), L = b.map(x => x.l), O = b.map(x => x.o);
+    const A = V.map((v, i) => v * C[i]);          // 成交额的近似（量 × 收盘），日线和盘中算法一致
+    const ma = (X, k) => { const out = new Array(n).fill(NaN); for (let i = k - 1; i < n; i++) { let s = 0; for (let j = i - k + 1; j <= i; j++) s += X[j]; out[i] = s / k; } return out; };
+    const m5 = ma(C, 5), m10 = ma(C, 10), m20 = ma(C, 20), v5 = ma(V, 5), a10 = ma(A, 10), a60 = ma(A, 60);
     const vmax = new Array(n).fill(NaN); { let m = -Infinity; for (let i = 0; i < n; i++) { if (ok(v5[i])) m = Math.max(m, v5[i]); vmax[i] = m; } }
-    return { n, C, V, H, m5, m10, m20, v5, vmax };
+    const I = b.map(x => (IX && IX.has(x.t) ? IX.get(x.t) : NaN));
+    return { n, C, V, H, L, O, A, m5, m10, m20, v5, a10, a60, vmax, I, hold: [] };
   }
   const maxOf = (A, a, z) => { let m = -Infinity; for (let j = Math.max(0, a); j <= z; j++) if (A[j] > m) m = A[j]; return m; };
+  const meanOf = (A, a, z) => { let s = 0; for (let j = a; j <= z; j++) s += A[j]; return s / (z - a + 1); };
+  // days since the last 20-day high (a bar whose high tops the 19 bars before it)
+  function sinceHigh(P, i) { for (let j = i; j >= Math.max(20, i - 30); j--) if (P.H[j] >= maxOf(P.H, j - 19, j - 1)) return i - j; return 30; }
+  // 主升持有的四条：收盘不破 5 日线；三个交易日内刷新过阶段新高；量能堆着（10 日均额不低于 60 日均额）；20 日线向上且 5 日线在 20 日线上
+  function holdAt(P, i) {
+    if (P.hold[i] !== undefined) return P.hold[i];
+    const { C, m5, m20, a10, a60 } = P;
+    const h = { ma5: C[i] >= m5[i], high: sinceHigh(P, i) <= 3, vol: a10[i] >= a60[i], trend: m5[i] > m20[i] && m20[i] >= m20[i - 5] };
+    h.all = h.ma5 && h.high && h.vol && h.trend;
+    P.hold[i] = h; return h;
+  }
   // every check is computed on bar i (the last bar is today's, still forming while the market is open)
-  function evalAt(b, P, i, code, name) {
-    if (i < 60) return null;
-    const { C, V, H, m5, m10, m20, v5, vmax } = P, bar = b[i], c = C[i];
+  function evalAt(b, P, i, code, name, tech) {
+    if (i < 64) return null;
+    const { C, H, L, O, A, m5, m10, m20, v5, vmax, I } = P, bar = b[i], c = C[i];
     const lim = limitOf(code, name);
     const chg = c / C[i - 1] - 1;
     const limDn = c <= Math.round(C[i - 1] * (1 - lim) * 100) / 100 + 0.005;
-    let v20 = 0; for (let j = i - 24; j <= i - 5; j++) v20 += V[j]; v20 /= 20;
-    const hi60 = maxOf(H, i - 59, i), c60p = maxOf(C, i - 60, i - 1);
-    const uptrend = m5[i] > m10[i] && m10[i] > m20[i] && m20[i] > m20[i - 5];
-    const must = {
-      above5: c > m5[i],
-      up5: m5[i] > m5[i - 1],
-      bias: c / m5[i] - 1 <= 0.08,
-      notLimDn: !limDn,
-      heap: v5[i] >= 1.2 * v20
-    };
+    const aPrev5 = meanOf(A, i - 5, i - 1);
+    const hold = holdAt(P, i), prevHold = holdAt(P, i - 1);
+    const c20p = maxOf(C, i - 20, i - 1), c60p = maxOf(C, i - 60, i - 1), hi60 = maxOf(H, i - 59, i);
     const trig = {
-      reclaim: C[i - 1] <= m5[i - 1] && c > m5[i] && V[i] >= 1.5 * V[i - 1],
-      pull5: uptrend && bar.l <= m5[i] * 1.01 && c >= m5[i],
-      pull10: uptrend && bar.l <= m10[i] * 1.01 && c >= m10[i] && !(bar.l <= m5[i] * 1.01 && c >= m5[i]),
-      newHigh: c > c60p
+      // 爆发日：放量大阳（主板 5% / 20cm 7% 以上），突破 20 日收盘高点或从 5 日线下翻上来，收在高位——原规则：爆发日追高不叫追
+      burst: chg >= (lim >= 0.2 ? 0.07 : 0.05) && A[i] >= 1.5 * aPrev5 && (c > c20p || C[i - 1] < m5[i - 1]) && c >= bar.h * 0.97,
+      // 分歧低吸：昨天还在主升里，今天不涨（≤2%），回踩到 5 日线或 10 日线附近，收盘守住 10 日线
+      dip: prevHold.all && chg <= 0.02 && (L[i] <= m5[i] * 1.01 || L[i] <= m10[i] * 1.01) && c >= m10[i] && !limDn,
+      // 反包：前一天大阴（跌 3% 以上的阴线），今天收回前一天的开盘价并站上 5 日线
+      fanbao: C[i - 1] / C[i - 2] - 1 <= -0.03 && C[i - 1] < O[i - 1] && c > O[i - 1] && c >= m5[i],
+      // 放量站上 5 日线：前一天在 5 日线下，今天站上，量至少是前一天的 1.5 倍
+      reclaim: C[i - 1] <= m5[i - 1] && c > m5[i] && P.V[i] >= 1.5 * P.V[i - 1],
+      // 放量新高：整理两天以上后，收盘再创 60 日新高，成交额比前 5 天均值多两成（确认趋势后的带量拉升是加仓点；缩量过前高不算）
+      newHigh: c > c60p && A[i] >= 1.2 * aPrev5 && sinceHigh(P, i - 1) >= 2
     };
-    const nearHigh = c >= 0.97 * hi60;
+    const anyTrig = trig.burst || trig.dip || trig.fanbao || trig.reclaim || trig.newHigh;
+    const buy = anyTrig && !limDn && c >= m5[i];
+    const state = buy ? 'buy' : hold.all ? 'hold' : 'no';
+    const fails = ['ma5', 'high', 'vol', 'trend'].filter(k => !hold[k]).length;
+    // relative strength against the stock's own gate index
+    const ixOk = ok(I[i]) && ok(I[i - 20]);
+    const ixChg = j => I[j] / I[j - 1] - 1;
+    const rs = ixOk && c / C[i - 20] - 1 > I[i] / I[i - 20] - 1;
+    let kd = false; if (ixOk && c >= m5[i]) for (let j = i - 9; j <= i; j++) if (ok(I[j]) && ok(I[j - 1]) && ixChg(j) <= -0.01 && C[j] / C[j - 1] - 1 >= -0.005) { kd = true; break; }
+    const lead = ixOk && c > c60p && I[i] < 0.98 * maxOf(I, i - 20, i);
     const extreme = ok(v5[i]) && v5[i] >= vmax[i] * 0.999 && (i >= 120 || P.vmLong);
-    const anyTrig = trig.reclaim || trig.pull5 || trig.pull10 || trig.newHigh;
-    const fails = Object.values(must).filter(x => !x).length + (nearHigh || anyTrig ? 0 : 1);
     // sell / warning signals
     const sell = [], warn = [];
     if (c < m5[i]) { if (C[i - 1] < m5[i - 1]) sell.push('跌破 5 日线后没收回'); else sell.push('跌破 5 日线'); }
-    let lastHi = -1; for (let j = i; j >= Math.max(20, i - 30); j--) { if (H[j] >= maxOf(H, j - 19, j - 1)) { lastHi = j; break; } }
-    const noHigh = lastHi < 0 ? 30 : i - lastHi;
+    const noHigh = sinceHigh(P, i), ret20 = c / C[i - 20] - 1;
     if (noHigh > 3) warn.push(noHigh >= 30 ? '一个多月没刷新阶段新高' : noHigh + ' 个交易日没刷新阶段新高');
-    for (let j = i - 1; j >= i - 9; j--) { if (C[j] / C[j - 1] - 1 >= 0.07 && C[j] > b[j].o) { if (c < (b[j].o + C[j]) / 2) warn.push(b[j].t.slice(5).replace('-', '/') + ' 大阳线回吐过半'); break; } }
+    else if (noHigh >= 2 && ret20 >= 0.3) warn.push('高位 ' + noHigh + ' 天没新高，先做减法');
+    for (let j = i - 1; j >= i - 9; j--) { if (C[j] / C[j - 1] - 1 >= 0.07 && C[j] > O[j]) { if (c < (O[j] + C[j]) / 2) warn.push(b[j].t.slice(5).replace('-', '/') + ' 大阳线回吐过半'); break; } }
     if (limDn) warn.push('跌停');
-    return { i, t: bar.t, c, chg, m5: m5[i], m10: m10[i], m20: m20[i], bias: c / m5[i] - 1, volx: v5[i] / v20, must, trig, nearHigh, extreme, anyTrig, fails, pass: fails === 0, sell, warn, ret20: c / C[i - 20] - 1, noHigh };
+    if (ok(I[i]) && ok(I[i - 1]) && ixChg(i) >= 0.015 && chg < 0) warn.push('指数大涨它不涨');
+    if (c > c60p && A[i] < 0.8 * aPrev5) warn.push('缩量过前高');
+    if (A[i] >= 2 * aPrev5 && Math.abs(chg) <= 0.01 && c >= 0.95 * hi60) warn.push('放量滞涨');
+    return { i, t: bar.t, c, chg, m5: m5[i], m10: m10[i], m20: m20[i], bias: c / m5[i] - 1, amtx: P.a10[i] / P.a60[i], hold, trig, anyTrig, buy, state, pass: state !== 'no', fails, notLimDn: !limDn,
+      rs, kd, lead, extreme, tech: !!tech, sell, warn, ret20, noHigh };
   }
-  const MUST_TXT = { above5: '5日线上', up5: '5日线向上', bias: '乖离≤8%', notLimDn: '没跌停', heap: '堆量' };
-  const TRIG_TXT = { reclaim: '放量站上5日线', pull5: '回踩5日线', pull10: '回踩10日线', newHigh: '创60日新高' };
+  // ==== ENGINE END ====
+  const HOLD_TXT = { ma5: '收盘在5日线上', high: '3天内有新高', vol: '量能堆着', trend: '20日线向上' };
+  const TRIG_TXT = { burst: '爆发日', dip: '分歧低吸', fanbao: '反包', reclaim: '放量上5日线', newHigh: '放量新高' };
+  // gate index for each stock: 科技 → 科创50（没有数据的日子用创业板指），其余 → 上证
+  const GIX = { kc: '1.000688', cy: '0.399006', sh: '1.000001' };
+  const IXS = { T: new Map(), N: new Map(), at: 0 };
+  let ixLong = null, ixLongAt = 0;
+  async function ensureIx(B) {
+    if (!ixLong || Date.now() - ixLongAt > 1800000) {
+      ixLongAt = Date.now();
+      ixLong = Promise.all(Object.keys(GIX).map(k => indexBars(GIX[k], 800).then(b => [k, b]).catch(() => [k, []]))).then(x => Object.fromEntries(x));
+    }
+    // never hold the scan up for long: without the long history, the base file and today's bars still cover the last 60 days
+    const L = await Promise.race([ixLong, new Promise(r => setTimeout(() => r({}), 4000))]), M = { kc: new Map(), cy: new Map(), sh: new Map() };
+    if (B && B.ix) Object.keys(M).forEach(k => (B.ix[k] || []).forEach((v, j) => { if (v != null) M[k].set(B.dates[j], v); }));
+    Object.keys(M).forEach(k => (L[k] || []).forEach(b => M[k].set(b.t, b.c)));
+    if (S.mkt && S.mkt.G) Object.keys(M).forEach(k => { const g = S.mkt.G[k]; if (g) g.bars.forEach(b => M[k].set(b.t, b.c)); });
+    const T = new Map(M.cy); M.kc.forEach((v, t) => T.set(t, v));
+    // 科创50 and 创业板指 differ in level: only use 创业板指 where 科创50 has no data at all (before 2020)
+    const kcStart = [...M.kc.keys()].sort()[0];
+    if (kcStart) [...T.keys()].forEach(t => { if (t >= kcStart && !M.kc.has(t)) T.delete(t); });
+    IXS.T = T; IXS.N = M.sh; IXS.at = Date.now();
+  }
+  const indOf = id => (S.base && S.base.s[id] && S.base.s[id].g) || '';
+  const techOf = (id, code) => isTech(code, indOf(id));
+  function evalBars(bars, st, P0) {
+    const tech = techOf(st.id, st.code), P = prep(bars, tech ? IXS.T : IXS.N);
+    if (P0) { const i = bars.length - 1; P.vmax[i] = Math.max(P0.vm, ok(P.v5[i]) ? P.v5[i] : 0); P.vmLong = true; }
+    return { P, r: evalAt(bars, P, bars.length - 1, st.code, st.name, tech), tech };
+  }
+  const LV_TXT = ['在 5 日线下', '只在 5 日线上（最低要求）', '在 10 日线上（共振）'];
 
   // ---------- state ----------
   const S = { mkt: null, scan: [], scanAt: 0, mode: 'ok', watch: [], wdata: {}, detail: null, busy: false, timer: 0, lastScan: 0 };
   try { const w = JSON.parse(store.get('rt-watch') || '[]'); if (Array.isArray(w)) S.watch = w.filter(x => x && /^[01]\.\d{6}$/.test(x.id)); } catch (e) {}
-  { const m = store.get('rt-mode'); if (m === 'ok' || m === 'near' || m === 'all') S.mode = m; }
+  { const m = store.get('rt-mode'); if (['ok', 'buy', 'near', 'all'].includes(m)) S.mode = m; }
   const saveWatch = () => store.set('rt-watch', JSON.stringify(S.watch));
   const inWatch = id => S.watch.some(x => x.id === id);
   function toggleWatch(st) {
@@ -1014,6 +1200,11 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const res = await Promise.all(LINES.map(([k, code]) => thsDaily(code).then(d => [k, d])));
     const m = {}; res.forEach(([k, d]) => { m[k] = Object.assign(lineStat(d.bars), { bars: d.bars }); });
     try { const sh = await emKline('1.000001', 30); m.sh = lineStat(sh.bars); m.sh.v = sh.bars.map(b => b.a); } catch (e) { m.sh = null; }
+    m.G = {};
+    await Promise.all(['kc', 'cy'].map(k => indexBars(GIX[k], 60).then(b => { if (b.length >= 50) m.G[k] = Object.assign(lineStat(b), { bars: b }); }).catch(() => {})));
+    if (m.sh) m.G.sh = Object.assign({}, m.sh, { bars: [] });
+    const lvOf = g => (g ? (g.above ? 2 : g.above5 ? 1 : 0) : -1);
+    m.techLv = Math.max(lvOf(m.G.kc), lvOf(m.G.cy));
     const A = m.A.bars; m.amt = A[A.length - 1].a; m.amtPrev = A[A.length - 2].a; m.amtT = A[A.length - 1].t;
     m.dsOk = LINES.every(([k]) => m[k].above);
     m.lv = amtLevel(m.amt);
@@ -1041,6 +1232,15 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       '<div class="cond-nums"><span>档位 <b>' + AMT[lv][1] + '</b></span><span>前一天 <b>' + yi(m.amtPrev) + '</b></span></div>' +
       '<p class="sk-why">' + AMT[lv][2] + '</p>';
     box.appendChild(a);
+    // 科技 has its own gate: 科创50 / 创业板指
+    if (m.techLv >= 0) {
+      const t = el('div', 'cond ' + (m.techLv === 2 ? 'is-up' : 'is-down'));
+      const row = (k, nm) => { const g = m.G[k]; return g ? '<span>' + nm + ' <b class="' + cls(g.chg) + '">' + pct(g.chg) + '</b> ' + (g.above ? '10日线上' : g.above5 ? '5日线上' : '5日线下') + '</span>' : ''; };
+      t.innerHTML = '<div class="cond-top"><span class="cond-name">科技闸门</span><span class="cond-code">科创50 · 创业板指</span></div><div class="cond-sub">科技股不看全A，看这两个</div>' +
+        '<div class="cond-state"><span class="mark">' + (m.techLv === 2 ? '✓' : m.techLv === 1 ? '~' : '×') + '</span>' + LV_TXT[m.techLv] + '</div>' +
+        '<div class="cond-nums">' + row('kc', '科创50') + row('cy', '创业板指') + '</div>' + (m.G.kc ? sparkSvg(m.G.kc.spark) : '') + '<p class="sk-why">原规则：科技只看自己的指数和板块；放量站上 10 日线才算共振，一波下跌后起码要上 5 日线。</p>';
+      box.appendChild(t);
+    }
     // two thermometers on the 5-day line
     const y = m.Y.above5, h = m.H.above5;
     const T4 = { '11': ['强强', '两个温度计同频，行情级别最高：容量中军和持续大涨的强势股都可以跟'], '10': ['强弱', '大容量票是行情主体：做成交前排的中军'], '01': ['弱强', '大票走弱、小票走强：小票和情绪方向，轻仓'], '00': ['弱弱', '两个都在走弱：休息'] };
@@ -1051,17 +1251,35 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const nUp = LINES.filter(([k]) => m[k].above).length;
     $('rt-badge').textContent = m.dsOk ? '大势符合' : '大势不符合';
     $('rt-badge').className = 'v-badge ' + (m.dsOk ? 'ok' : 'no');
-    $('rt-time').textContent = m.A.t + ' · ' + SESS_TXT[sess] + ' · 北京时间 ' + bj().hms;
+    $('rt-time').innerHTML = (sess === 'open' ? '<span class="live-dot" aria-hidden="true"></span>' : '') + m.A.t + ' · ' + SESS_TXT[sess] + ' · 北京时间 ' + bj().hms;
     $('rt-sum').textContent = (m.dsOk ? '三条线都在 10 日线上方' : (nUp === 0 ? '三条线全部' : '三条线里有 ' + (3 - nUp) + ' 条') + '在 10 日线下方') + '；两市成交额' + (live ? '目前' : '') + ' ' + yi(m.amt) + '，' + AMT[lv][2] + '。' +
-      (m.dsOk && lv >= 1 ? '可以往下看选股。' : '按原规则，今天到这里就够了，不选股。');
+      (m.dsOk && lv >= 1 ? '可以往下看选股。' : m.techLv === 2 && lv >= 1 ? '不过科技指数在 10 日线上方，科技股可以单独看。' : '按原规则，今天到这里就够了，不选股。') +
+      (m.techLv >= 0 ? ' 科技闸门：科创50 / 创业板指' + LV_TXT[m.techLv] + '。' : '');
     gate();
+    flashNums($('rt-conds'), '.cond', 'b');
+  }
+  // numbers that changed since the last refresh glow red (up) or green (down) for a moment
+  const FLASH = new Map();
+  function flashNums(box, itemSel, numSel) {
+    if (!box || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    box.querySelectorAll(itemSel).forEach((it, ci) => it.querySelectorAll(numSel).forEach((b, bi) => {
+      const k = box.id + ci + '-' + bi, v = parseFloat(b.textContent.replace(/[^\d.\-−+]/g, '').replace('−', '-'));
+      const old = FLASH.get(k); FLASH.set(k, v);
+      if (ok(old) && ok(v) && old !== v) { b.classList.remove('flash-up', 'flash-down'); void b.offsetWidth; b.classList.add(v > old ? 'flash-up' : 'flash-down'); }
+    }));
+  }
+  // the gate is per kind of stock: 科技 looks at 科创50 / 创业板指, the rest at the three 同花顺 lines
+  function gateText(nonTechOk, techLv, lv, amtTxt) {
+    const lvT = lv === 0 ? '成交额' + amtTxt + '，不到 2 万亿，原规则休息' : lv === 1 ? '成交额' + amtTxt + '，只算局部机会，不重仓' : lv === 2 ? '成交额' + amtTxt + '，容量票可以重仓' : '成交额' + amtTxt + '，主线走得出来的量';
+    const a = nonTechOk == null ? '' : '非科技：三条线' + (nonTechOk ? '都在 10 日线上方，大势符合' : '没有都在 10 日线上方，大势不符合') + '。';
+    const b = techLv < 0 ? '' : '科技：科创50 / 创业板指' + LV_TXT[techLv] + (techLv === 2 ? '，科技可以做' : techLv === 1 ? '，只够试错' : '，科技不做') + '。';
+    const okAny = (nonTechOk || techLv === 2) && lv >= 1, part = !okAny && (techLv === 1 || nonTechOk) && lv >= 1;
+    return { cls: 'rt-gate ' + (okAny ? (lv >= 2 ? 'ok' : 'part') : part ? 'part' : 'no'), text: a + b + lvT + '。' + (okAny ? '' : '按原规则这天下面只当观察，不是买点。') };
   }
   function gate() {
     const m = S.mkt, g = $('rt-gate'); if (!m || S.histDay) return;
-    if (!m.dsOk) { g.className = 'rt-gate no'; g.textContent = '大势不符合：原规则是择时条件不符合就别选股。下面只当观察，不是买点。'; }
-    else if (m.lv === 0) { g.className = 'rt-gate no'; g.textContent = '大势符合，但两市成交额不到 2 万亿：原规则是 2 万亿以下休息。下面只当观察。'; }
-    else if (m.lv === 1) { g.className = 'rt-gate part'; g.textContent = '大势符合，成交额在 2 万亿到 2.5 万亿：只算局部机会，不重仓。'; }
-    else { g.className = 'rt-gate ok'; g.textContent = '大势符合，成交额 2.5 万亿以上：按原规则可以选股。'; }
+    const t = gateText(m.dsOk, m.techLv, m.lv, ' ' + yi(m.amt));
+    g.className = t.cls; g.textContent = t.text;
   }
 
   // ---------- screening ----------
@@ -1071,7 +1289,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const day = bj().date + '-' + (bj().min >= 1170 ? 'b' : 'a');   // re-read after 19:30, when the new file is out
     if (baseP && baseDay === day) return baseP;
     baseDay = day;
-    baseP = fetch('base.json?d=' + day, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('基准文件 ' + r.status); return r.json(); }).catch(e => { baseP = null; throw e; });
+    baseP = fetch('base.json?d=' + day, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('基准文件 ' + r.status); return r.json(); }).then(B => { if (B.v !== 2) throw new Error('基准文件还是旧格式，正在重算'); S.base = B; return B; }).catch(e => { baseP = null; throw e; });
     return baseP;
   }
   // history bars from the base file, plus the live bar when it is a newer day
@@ -1096,9 +1314,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   }
   function evalBase(B, id, live, code, name) {
     const x = baseBars(B, id, live); if (!x) return null;
-    const P = prep(x.bars), i = x.bars.length - 1;
-    P.vmax[i] = Math.max(x.vm, ok(P.v5[i]) ? P.v5[i] : 0); P.vmLong = true;
-    const r = evalAt(x.bars, P, i, code, name || x.name);
+    const { r } = evalBars(x.bars, { id, code, name: name || x.name }, x);
     if (r) r.liveBar = x.bars.length > B.s[id].c.length;
     return r;
   }
@@ -1110,6 +1326,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     rows.forEach(r => { const id = r.f13 + '.' + r.f12; if (!seen.has(id)) { seen.add(id); patch(id, fromEM(r)); list.push({ id, code: r.f12, name: r.f14, amt: r.f6, turn: r.f8, flt: r.f21 }); } });
     if (!list.length) throw new Error('候选池为空');
     let B = null; try { B = await loadBase(); } catch (e) { S.baseErr = e.message; }
+    try { await ensureIx(B); } catch (e) {}
     let res;
     if (B) {
       S.baseDate = B.d;
@@ -1121,34 +1338,59 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       res = await pool(list.slice(0, 40), 2, async st => {
         const k = await emKline(st.id, 500);
         if (k.bars.length < 61) return null;
-        const P = prep(k.bars), r = evalAt(k.bars, P, k.bars.length - 1, st.code, st.name);
+        const { r } = evalBars(k.bars, st);
         return r && Object.assign(r, st);
       });
       S.scanMissing = list.length - 40;
     }
     const out = res.filter(Boolean);
     const byRet = out.slice().sort((a, b) => b.ret20 - a.ret20); byRet.forEach((r, k) => { r.rank20 = k + 1; });
-    out.forEach(r => { r.bonus = (r.extreme ? 1 : 0) + (r.rank20 <= 50 ? 1 : 0); });
+    // 大马拉小车：成交额前 100 里，换手率排在前三成；主线：成交额前 40 里同一行业 3 只以上、数量排前二的行业
+    const byAmt = out.slice().sort((a, b) => b.amt - a.amt);
+    const t100 = byAmt.slice(0, 100).map(r => r.turn).filter(ok).sort((a, b) => a - b);
+    const cut = t100.length >= 10 ? t100[Math.round(0.7 * (t100.length - 1))] : Infinity;
+    const cnt = {}; byAmt.slice(0, 40).forEach(r => { const g = indOf(r.id); if (g) cnt[g] = (cnt[g] || 0) + 1; });
+    const main = new Set(Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 2).filter(x => x[1] >= 3).map(x => x[0]));
+    S.mainInd = Object.entries(cnt).sort((a, b) => b[1] - a[1]).slice(0, 3);
+    byAmt.forEach((r, k) => { r.dm = k < 100 && ok(r.turn) && r.turn >= cut; r.main = main.has(indOf(r.id)); });
+    out.forEach(r => { r.bonus = (r.rs ? 1 : 0) + (r.kd ? 1 : 0) + (r.lead ? 1 : 0) + (r.extreme ? 1 : 0) + (r.dm ? 1 : 0) + (r.main ? 1 : 0) + (r.rank20 <= 50 ? 1 : 0); });
     S.scan = out; S.scanAt = Date.now(); S.scanN = list.length;
   }
   function chip(cls, text) { return '<span class="' + cls + '">' + text + '</span>'; }
+  function stateChip(r) {
+    if (r.buy) return chip('st-chip buy', '买点：' + Object.keys(TRIG_TXT).filter(k => r.trig[k]).map(k => TRIG_TXT[k]).join('、'));
+    if (r.state === 'hold') return chip('st-chip hold', '主升持有');
+    return chip('st-chip no', '不符合（主升四条差 ' + r.fails + ' 条）');
+  }
+  function bonusChips(r) {
+    const bn = [];
+    if (r.rs) bn.push(chip('bn-chip', '强于指数'));
+    if (r.kd) bn.push(chip('bn-chip', '指数跌它抗跌'));
+    if (r.lead) bn.push(chip('bn-chip', '率先新高'));
+    if (r.extreme) bn.push(chip('bn-chip', '极限量'));
+    if (r.dm) bn.push(chip('bn-chip', '大马拉小车'));
+    if (r.main) bn.push(chip('bn-chip', '主线板块'));
+    if (r.rank20 <= 50) bn.push(chip('bn-chip', '20日涨幅第' + r.rank20));
+    return bn.join('');
+  }
   function stockCard(r, opts) {
     const d = el('div', 'sk');
     const sig = opts && opts.sig;
-    if (sig) d.classList.add(r.sell.length ? 'sell' : r.warn.length ? 'warn' : 'okk'); else if (r.pass) d.classList.add('okk');
+    if (sig) d.classList.add(r.sell.length ? 'sell' : r.warn.length ? 'warn' : 'okk'); else if (r.pass) d.classList.add(r.buy ? 'okk' : 'hld');
     d.tabIndex = 0; d.setAttribute('role', 'button'); d.setAttribute('aria-label', '查看 ' + r.name);
     let h = '<div class="sk-top"><span class="sk-name">' + r.name + '<small>' + r.code + '</small></span><span class="sk-px ' + cls(r.chg) + '">' + (r.hist ? '' : px(r.c)) + '<small>' + pct(r.chg) + '</small></span></div>';
-    h += '<div class="sk-meta">' + (r.amt ? '<span>成交 <b>' + yi(r.amt) + '</b></span>' : '') + (ok(r.turn) ? '<span>换手 <b>' + r.turn.toFixed(1) + '%</b></span>' : '') + (ok(r.bias) ? '<span>离5日线 <b class="' + cls(r.bias) + '">' + pct(r.bias, 1) + '</b></span>' : '') + (ok(r.volx) ? '<span>量比5/20 <b>' + r.volx.toFixed(2) + '</b></span>' : '') + '</div>';
+    h += '<div class="sk-meta">' + (r.amt ? '<span>成交 <b>' + yi(r.amt) + '</b></span>' : '') + (ok(r.turn) ? '<span>换手 <b>' + r.turn.toFixed(1) + '%</b></span>' : '') + (ok(r.bias) ? '<span>离5日线 <b class="' + cls(r.bias) + '">' + pct(r.bias, 1) + '</b></span>' : '') + (ok(r.amtx) ? '<span>量能10/60 <b>' + r.amtx.toFixed(2) + '</b></span>' : '') + '</div>';
     if (sig) {
       const s = r.sell.length ? chip('sg-chip sell', r.live ? '盘中' + r.sell[0] : '卖出：' + r.sell[0]) : '';
       const w = r.warn.map(x => chip('sg-chip warn', x)).join('');
-      h += '<div class="sk-chips">' + (s || w ? s + w : chip('sg-chip hold', '持有条件还在：5 日线上方')) + '</div>';
+      h += '<div class="sk-chips">' + (s || w ? s + w : chip('sg-chip hold', '持有条件还在：5 日线上方')) + '</div><div class="sk-chips">' + stateChip(r) + bonusChips(r) + '</div>';
       if (r.sell.length && r.live) h += '<p class="sk-why">盘中跌破、还没收盘：原规则是不能快速收回或收盘跌破才出。</p>';
     } else {
-      h += '<div class="sk-chips">' + Object.keys(MUST_TXT).map(k => chip(r.must[k] ? 'ok-chip' : 'no-chip', MUST_TXT[k])).join('') + chip(r.nearHigh ? 'ok-chip' : 'no-chip', '近60日新高') + '</div>';
-      const tr = Object.keys(TRIG_TXT).filter(k => r.trig[k]).map(k => chip('tr-chip', TRIG_TXT[k]));
-      const bn = []; if (r.extreme) bn.push(chip('bn-chip', '极限量')); if (r.rank20 <= 50) bn.push(chip('bn-chip', '20日涨幅第' + r.rank20));
-      if (tr.length || bn.length) h += '<div class="sk-chips">' + tr.join('') + bn.join('') + '</div>';
+      h += '<div class="sk-chips">' + stateChip(r) + (r.tech ? chip('kind-chip', '科技') : '') + '</div>';
+      h += '<div class="sk-chips">' + Object.keys(HOLD_TXT).map(k => chip(r.hold[k] ? 'ok-chip' : 'no-chip', HOLD_TXT[k])).join('') + '</div>';
+      const bn = bonusChips(r);
+      if (bn) h += '<div class="sk-chips">' + bn + '</div>';
+      if (r.warn && r.warn.length) h += '<div class="sk-chips">' + r.warn.map(x => chip('sg-chip warn', x)).join('') + '</div>';
     }
     h += '<div class="sk-row"><span class="cap">' + (sig ? (r.t || '') : '') + '</span><button type="button" class="star' + (inWatch(r.id) ? ' on' : '') + '">' + (inWatch(r.id) ? '★ 已自选' : '☆ 加自选') + '</button></div>';
     d.innerHTML = h;
@@ -1158,17 +1400,23 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     d.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
     return d;
   }
+  const IND_NAME = { C39: '电子/通信', I63: '电信', I64: '互联网', I65: '软件', C35: '专用设备', C38: '电气/电池', C34: '通用设备', C40: '仪器仪表', C26: '化工', C27: '医药', C36: '汽车', C37: '军工/交运设备', C32: '有色', C30: '建材', J66: '银行', J67: '证券', J68: '保险', C15: '酒饮料', C13: '农副食品', B06: '煤炭', B07: '石油', D44: '电力', C33: '金属制品', C29: '塑料橡胶', C31: '钢铁', K70: '地产', M73: '研发服务', R86: '传媒', F51: '批发', F52: '零售', G54: '道路运输', G55: '航运', G56: '航空', E48: '建筑' };
+  const mainTxt = ms => (ms && ms.length ? '<span>成交前 40 里最多的行业 <b>' + ms.map(([g, c]) => (IND_NAME[g] || g) + ' ' + c).join('，') + '</b></span>' : '');
+  function splitLists(all) {
+    const score = r => (r.buy ? 100 : 0) + r.bonus;
+    const ok = all.filter(r => r.pass).sort((a, b) => score(b) - score(a) || b.amt - a.amt);
+    return { ok, buy: ok.filter(r => r.buy), near: all.filter(r => !r.pass && r.fails === 1).sort((a, b) => b.amt - a.amt), all: all.slice().sort((a, b) => (b.pass - a.pass) || a.fails - b.fails || b.amt - a.amt) };
+  }
   function renderScan() {
     if (S.histDay) return renderHist();
     gate();
     const box = $('rt-scan'); box.innerHTML = '';
     const all = S.scan;
     if (!all.length) { box.appendChild(el('div', 'rt-empty', S.scanErr ? '候选池没拉到：' + S.scanErr : '正在扫描成交额前 200 的股票……')); return; }
-    const okL = all.filter(r => r.pass).sort((a, b) => b.bonus - a.bonus || b.amt - a.amt);
-    const nearL = all.filter(r => r.fails === 1).sort((a, b) => b.amt - a.amt);
-    const list = S.mode === 'ok' ? okL : S.mode === 'near' ? nearL : all.slice().sort((a, b) => a.fails - b.fails || b.amt - a.amt);
-    $('rt-s-stats').innerHTML = (S.baseDate ? '<span>历史数据到 <b>' + S.baseDate.slice(5).replace('-', '/') + '</b></span>' : '') + '<span>候选 <b>' + all.length + '</b></span><span>符合 <b>' + okL.length + '</b></span><span>差一条 <b>' + nearL.length + '</b></span><span>扫描于 <b>' + bjAt(S.scanAt) + '</b></span>';
-    if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'ok' ? '今天成交额前 200 里没有全部符合条件的股票。' : '没有。')); return; }
+    const L = splitLists(all);
+    const list = L[S.mode] || L.ok;
+    $('rt-s-stats').innerHTML = (S.baseDate ? '<span>历史数据到 <b>' + S.baseDate.slice(5).replace('-', '/') + '</b></span>' : '') + '<span>候选 <b>' + all.length + '</b></span><span>买点 <b>' + L.buy.length + '</b></span><span>主升持有 <b>' + (L.ok.length - L.buy.length) + '</b></span><span>差一条 <b>' + L.near.length + '</b></span>' + mainTxt(S.mainInd) + '<span>扫描于 <b>' + bjAt(S.scanAt) + '</b></span>';
+    if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'near' || S.mode === 'all' ? '没有。' : '今天成交额前 200 里没有' + (S.mode === 'buy' ? '出现买点' : '在主升里') + '的股票。')); return; }
     list.slice(0, 120).forEach(r => box.appendChild(stockCard(r)));
     if (list.length > 120) box.appendChild(el('div', 'rt-empty', '只显示前 120 只，其余 ' + (list.length - 120) + ' 只按成交额排在后面。'));
   }
@@ -1204,12 +1452,18 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     res.ok = LINES.every(([k]) => res[k].above); res.lv = amtLevel(res.amt);
     return res;
   }
-  const BIT = ['above5', 'up5', 'bias', 'notLimDn', 'heap', 'nearHigh', 'reclaim', 'pull5', 'pull10', 'newHigh', 'extreme'];
-  function histRow(x, names, day) {
-    const [id, chg, amt, turn, fl, rank20, fails] = x, f = {}; BIT.forEach((k, b) => { f[k] = !!(fl & (1 << b)); });
-    return { hist: true, day, id, code: id.slice(2), name: names[id] || id.slice(2), chg: chg / 100, amt: amt * 1e8, turn, rank20, fails, pass: fails === 0,
-      must: { above5: f.above5, up5: f.up5, bias: f.bias, notLimDn: f.notLimDn, heap: f.heap }, nearHigh: f.nearHigh,
-      trig: { reclaim: f.reclaim, pull5: f.pull5, pull10: f.pull10, newHigh: f.newHigh }, extreme: f.extreme, bias: NaN, volx: NaN, sell: [], warn: [] };
+  function histRow(x, names, day, bits) {
+    const [id, chg, amt, turn, fl, rank20, fails, xb] = x, f = {}; bits.forEach((k, b) => { f[k] = !!(fl & (1 << b)); });
+    const base = { hist: true, day, id, code: id.slice(2), name: names[id] || id.slice(2), chg: chg / 100, amt: amt * 1e8, turn, rank20, fails, bias: NaN, amtx: NaN, sell: [], warn: [], bonus: 0 };
+    if (bits[0] !== 'ma5') {          // files from before the rules were rebuilt: only pass / near is known
+      return Object.assign(base, { legacy: true, hold: { ma5: f.above5, high: f.nearHigh, vol: f.heap, trend: f.up5 }, trig: {}, buy: false, state: fails === 0 ? 'hold' : 'no', pass: fails === 0, fails: fails || 1 });
+    }
+    const hold = { ma5: f.ma5, high: f.high, vol: f.vol, trend: f.trend }; hold.all = hold.ma5 && hold.high && hold.vol && hold.trend;
+    const trig = { burst: f.burst, dip: f.dip, fanbao: f.fanbao, reclaim: f.reclaim, newHigh: f.newHigh };
+    const buy = Object.values(trig).some(Boolean) && f.notLimDn && f.ma5, state = buy ? 'buy' : hold.all ? 'hold' : 'no';
+    const r = Object.assign(base, { hold, trig, buy, state, pass: state !== 'no', rs: f.rs, kd: f.kd, lead: f.lead, extreme: f.extreme, tech: f.tech, dm: !!(xb & 1), main: !!(xb & 2) });
+    r.bonus = (r.rs ? 1 : 0) + (r.kd ? 1 : 0) + (r.lead ? 1 : 0) + (r.extreme ? 1 : 0) + (r.dm ? 1 : 0) + (r.main ? 1 : 0) + (r.rank20 <= 50 ? 1 : 0);
+    return r;
   }
   async function setHistDay(day, dir) {
     const note = $('rt-day-note');
@@ -1238,22 +1492,22 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   }
   async function renderHist() {
     const box = $('rt-scan'), g = $('rt-gate'), D = S.histDashi, day = S.histDay, data = S.histData;
-    const names = await histNames();
-    if (D === undefined) { g.className = 'rt-gate'; g.textContent = day + '：正在读取当天的大势……'; }
-    else if (D === null) { g.className = 'rt-gate'; g.textContent = day + '：这一天没有大势数据（同花顺全A 从 2018 年 5 月才开始有），下面只看个股条件。'; }
-    else if (D.err) { g.className = 'rt-gate part'; g.textContent = day + '：这天的大势数据暂时没拉到（同花顺偶尔拒绝），过几秒点一下 ◀ ▶ 再回来就会重试。下面先看个股条件。'; }
-    else if (!D.ok) { g.className = 'rt-gate no'; g.textContent = day + '：大势不符合（三条线没有都在 10 日线上方），成交额 ' + yi(D.amt) + '。按原规则这天不选股，下面只当观察。'; }
-    else if (D.lv === 0) { g.className = 'rt-gate no'; g.textContent = day + '：大势符合，但成交额 ' + yi(D.amt) + '，不到 2 万亿，按原规则休息。'; }
-    else if (D.lv === 1) { g.className = 'rt-gate part'; g.textContent = day + '：大势符合，成交额 ' + yi(D.amt) + '，只算局部机会。'; }
-    else { g.className = 'rt-gate ok'; g.textContent = day + '：大势符合，成交额 ' + yi(D.amt) + '，按原规则可以选股。'; }
-    const all = data.r.map(x => histRow(x, names, day));
-    const okL = all.filter(r => r.pass).sort((a, b) => b.amt - a.amt), nearL = all.filter(r => !r.pass).sort((a, b) => b.amt - a.amt);
-    const list = S.mode === 'ok' ? okL : S.mode === 'near' ? nearL : okL.concat(nearL);
-    $('rt-s-stats').innerHTML = '<span>日期 <b>' + day + '</b></span><span>候选 <b>' + data.n + '</b></span><span>符合 <b>' + okL.length + '</b></span><span>差一条 <b>' + nearL.length + '</b></span>';
+    const names = await histNames(), idx = await histIndex();
+    const gx = data.g || {}, tl = [gx.kc, gx.cy].filter(Boolean).map(x => x[0]), techLv = tl.length ? Math.max(...tl) : -1;
+    const amt = D && !D.err && ok(D.amt) ? D.amt : data.m && data.m.amt ? data.m.amt * 1e8 : NaN, lv = ok(amt) ? amtLevel(amt) : 0;
+    const nonTech = D === undefined || D === null || (D && D.err) ? null : D.ok;
+    const t = gateText(nonTech, techLv, lv, ok(amt) ? ' ' + yi(amt) : '（没有数据）');
+    const pre = D === undefined ? '（正在读取同花顺三条线）' : D === null ? '（这天没有同花顺全A，2018 年 5 月才开始有）' : D.err ? '（同花顺三条线暂时没拉到，点 ◀ ▶ 再回来会重试）' : '';
+    g.className = t.cls; g.textContent = day + '：' + t.text + pre;
+    const all = data.r.map(x => histRow(x, names, day, idx.bits));
+    const L = splitLists(all), list = L[S.mode] || L.ok;
+    $('rt-s-stats').innerHTML = '<span>日期 <b>' + day + '</b></span><span>候选 <b>' + data.n + '</b></span><span>买点 <b>' + L.buy.length + '</b></span><span>主升持有 <b>' + (L.ok.length - L.buy.length) + '</b></span><span>差一条 <b>' + L.near.length + '</b></span>' + mainTxt(data.ms) +
+      (data.m && data.m.u100 != null ? '<span>成交前 100 上涨 <b>' + data.m.u100 + '</b> 家</span>' : '') + (data.m && data.m.ts ? '<span>科技占成交 <b>' + data.m.ts + '%</b></span>' : '');
     box.innerHTML = '';
-    if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'ok' ? '这天成交额前 200 里没有全部符合条件的股票。' : '没有。')); return; }
+    if (all.length && all[0].legacy) box.appendChild(el('div', 'rt-empty', '历史清单正在按新规则重算（大约两个小时），现在显示的还是旧规则的结果。'));
+    if (!list.length) { box.appendChild(el('div', 'rt-empty', S.mode === 'near' || S.mode === 'all' ? '没有。' : '这天成交额前 200 里没有' + (S.mode === 'buy' ? '出现买点' : '在主升里') + '的股票。')); return; }
     list.slice(0, 120).forEach(r => box.appendChild(stockCard(r)));
-    if (S.mode === 'all') box.appendChild(el('div', 'rt-empty', '历史日期只保存了符合和差一条的股票。'));
+    if (S.mode === 'all') box.appendChild(el('div', 'rt-empty', '历史日期只保存了买点、主升持有和差一条的股票。'));
   }
   $('rt-day').addEventListener('change', () => { const v = $('rt-day').value; if (v) setHistDay(v, -1); });
   $('rt-day-prev').addEventListener('click', () => stepDay(-1));
@@ -1267,13 +1521,14 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     const sess = session(), today = bj().date;
     let snap = {}; try { snap = await emSnap(S.watch.map(x => x.id).concat(S.detail ? [S.detail.id] : [])); Object.keys(snap).forEach(id => patch(id, snap[id])); } catch (e) {}
     let B = null; try { B = await loadBase(); } catch (e) {}
+    try { await ensureIx(B); } catch (e) {}
     await pool(S.watch.slice(), 2, async st => {
       if (B && B.s[st.id]) {
         const r = evalBase(B, st.id, snap[st.id], st.code, st.name);
         if (r) { r.live = (sess === 'open' || sess === 'noon') && r.liveBar; S.wdata[st.id] = Object.assign(r, { id: st.id, code: st.code, name: st.name !== st.code ? st.name : B.s[st.id].n }); return; }
       }
       const k = await emKline(st.id, 500);
-      const P = prep(k.bars), i = k.bars.length - 1, r = evalAt(k.bars, P, i, st.code, k.name || st.name);
+      const i = k.bars.length - 1, { r } = evalBars(k.bars, { id: st.id, code: st.code, name: k.name || st.name });
       if (!r) { S.wdata[st.id] = { short: true, name: k.name, c: k.bars[i] && k.bars[i].c }; return; }
       r.live = (sess === 'open' || sess === 'noon') && k.bars[i].t === today;
       S.wdata[st.id] = Object.assign(r, { id: st.id, code: st.code, name: k.name || st.name });
@@ -1372,6 +1627,7 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   function renderDetailStar() { const D = S.detail; if (!D) return; $('rt-d-star').textContent = inWatch(D.id) ? '★ 移出自选' : '☆ 加入自选'; }
   async function openDetail(st, focus) {
     S.focus = focus || null;
+    if (DI.mode !== 'D') detailTf('D');
     const sec = $('rt-detail'); sec.hidden = false;
     $('rt-d-title').textContent = st.name + ' ' + st.code;
     $('rt-d-head').innerHTML = '<span>读取中……</span>'; $('rt-d-checks').innerHTML = '';
@@ -1379,10 +1635,10 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     if (!dc) makeChart();
     try {
       const k = await emKline(st.id, 750);
-      const P = prep(k.bars), i = k.bars.length - 1;
-      const sess = session(); const r = evalAt(k.bars, P, i, st.code, k.name || st.name);
+      try { await ensureIx(await loadBase().catch(() => null)); } catch (e) {}
+      const i = k.bars.length - 1, sess = session(); const { P, r, tech } = evalBars(k.bars, { id: st.id, code: st.code, name: k.name || st.name });
       if (r) r.live = (sess === 'open' || sess === 'noon') && k.bars[i].t === bj().date;
-      S.detail = { id: st.id, code: st.code, name: k.name || st.name, bars: k.bars, P, r, idx: new Map(k.bars.map((b, j) => [b.t, j])) };
+      S.detail = { id: st.id, code: st.code, name: k.name || st.name, bars: k.bars, P, r, tech, idx: new Map(k.bars.map((b, j) => [b.t, j])) };
       $('rt-d-title').textContent = S.detail.name + ' ' + st.code;
       renderDetailStar(); drawDetail(true);
     } catch (e) {
@@ -1390,9 +1646,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       try {
         const B = await loadBase(); let snap = {}; try { snap = await emSnap([st.id]); } catch (e2) {}
         const x = baseBars(B, st.id, snap[st.id]); if (!x) throw e;
-        const P = prep(x.bars), i = x.bars.length - 1; P.vmax[i] = Math.max(x.vm, ok(P.v5[i]) ? P.v5[i] : 0); P.vmLong = true;
-        const r = evalAt(x.bars, P, i, st.code, st.name);
-        S.detail = { id: st.id, code: st.code, name: x.name || st.name, bars: x.bars, P, r, idx: new Map(x.bars.map((b, j) => [b.t, j])), short: true };
+        const { P, r, tech } = evalBars(x.bars, st, x);
+        S.detail = { id: st.id, code: st.code, name: x.name || st.name, bars: x.bars, P, r, tech, idx: new Map(x.bars.map((b, j) => [b.t, j])), short: true };
         $('rt-d-title').textContent = S.detail.name + ' ' + st.code + '（最近 60 天）';
         renderDetailStar(); drawDetail(true);
       } catch (e3) { $('rt-d-head').innerHTML = '<span>这只股票的行情暂时没拉到（' + e.message + '），稍后再试。</span>'; }
@@ -1407,10 +1662,9 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     if (r) {
       const s = r.sell.length ? chip('sg-chip sell', (r.live ? '盘中' : '卖出：') + r.sell[0]) : chip('sg-chip hold', '持有条件还在');
       h += s + r.warn.map(x => chip('sg-chip warn', x)).join('');
-      h += Object.keys(MUST_TXT).map(k => chip(r.must[k] ? 'ok-chip' : 'no-chip', MUST_TXT[k])).join('') + chip(r.nearHigh ? 'ok-chip' : 'no-chip', '近60日新高');
-      h += Object.keys(TRIG_TXT).filter(k => r.trig[k]).map(k => chip('tr-chip', TRIG_TXT[k])).join('');
-      if (r.extreme) h += chip('bn-chip', '极限量');
-      h += chip(r.pass ? 'sg-chip hold' : 'sg-chip warn', r.pass ? '今天符合选股条件' : '今天不符合选股条件（差 ' + r.fails + ' 条）');
+      h += stateChip(r) + (D.tech ? chip('kind-chip', '科技：看科创50 / 创业板指') : chip('kind-chip', '非科技：看大盘'));
+      h += Object.keys(HOLD_TXT).map(k => chip(r.hold[k] ? 'ok-chip' : 'no-chip', HOLD_TXT[k])).join('');
+      h += bonusChips(r);
     } else h = '<span class="cap">上市时间太短，算不了这些条件。</span>';
     $('rt-d-checks').innerHTML = h;
     const u = css('--up'), d = css('--down');
@@ -1420,22 +1674,23 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     dVol.setData(b.map((x, j) => ({ time: x.t, value: x.v, color: (j && x.c >= b[j - 1].c ? u : d) + '99' })));
     const mk = [];
     for (let j = Math.max(61, n - 120); j < n; j++) {
-      const e = evalAt(b, P, j, D.code, D.name); if (!e) continue;
-      if (e.trig.reclaim) mk.push({ time: b[j].t, position: 'belowBar', color: css('--violet'), shape: 'arrowUp', text: '上5日' });
-      else if (e.trig.newHigh && !(evalAt(b, P, j - 1, D.code, D.name) || {}).trig?.newHigh) mk.push({ time: b[j].t, position: 'belowBar', color: css('--rsrs'), shape: 'circle', text: '新高' });
+      const e = evalAt(b, P, j, D.code, D.name, D.tech); if (!e || !e.buy) { if (P.C[j] < P.m5[j] && P.C[j - 1] >= P.m5[j - 1]) mk.push({ time: b[j].t, position: 'aboveBar', color: css('--down'), shape: 'arrowDown', text: '破5日' }); continue; }
+      const t = e.trig.burst ? '爆发' : e.trig.fanbao ? '反包' : e.trig.reclaim ? '上5日' : e.trig.newHigh ? '新高' : '低吸';
+      mk.push({ time: b[j].t, position: 'belowBar', color: e.trig.burst ? css('--up') : e.trig.dip ? css('--teal') : css('--violet'), shape: e.trig.dip ? 'circle' : 'arrowUp', text: t });
       if (P.C[j] < P.m5[j] && P.C[j - 1] >= P.m5[j - 1]) mk.push({ time: b[j].t, position: 'aboveBar', color: css('--down'), shape: 'arrowDown', text: '破5日' });
     }
     // pass / fail spans for the stock's own screening check
-    const pass = b.map((x, j) => { const e = j >= 61 ? evalAt(b, P, j, D.code, D.name) : null; return e ? e.pass : null; });
+    const stv = b.map((x, j) => { const e = j >= 64 ? evalAt(b, P, j, D.code, D.name, D.tech) : null; return e ? e.state : null; });
+    const pass = stv.map(v => (v == null ? null : v !== 'no'));
     const upc = css('--up'), dnc = css('--down');
     dBand.applyOptions({ visible: S.band });
-    dBand.setData(b.map((x, j) => pass[j] == null ? { time: x.t } : { time: x.t, value: 1, color: pass[j] ? upc + '3a' : dnc + '24' }));
-    if (S.band) for (let j = 62; j < n; j++) if (pass[j] != null && pass[j] !== pass[j - 1]) mk.push({ time: b[j].t, position: pass[j] ? 'belowBar' : 'aboveBar', color: pass[j] ? upc : dnc, shape: pass[j] ? 'arrowUp' : 'arrowDown', text: pass[j] ? '符合' : '不符合' });
+    dBand.setData(b.map((x, j) => stv[j] == null ? { time: x.t } : { time: x.t, value: 1, color: stv[j] === 'buy' ? upc + '4d' : stv[j] === 'hold' ? upc + '2e' : dnc + '24' }));
+    if (S.band) for (let j = 65; j < n; j++) if (pass[j] != null && pass[j - 1] != null && pass[j] !== pass[j - 1]) mk.push({ time: b[j].t, position: pass[j] ? 'belowBar' : 'aboveBar', color: pass[j] ? upc : dnc, shape: pass[j] ? 'arrowUp' : 'arrowDown', text: pass[j] ? '进主升' : '出主升' });
     if (S.focus && D.idx.has(S.focus)) mk.push({ time: S.focus, position: 'aboveBar', color: css('--accent'), shape: 'square', text: '查看日' });
     mk.sort((x, y) => (x.time < y.time ? -1 : x.time > y.time ? 1 : 0));
     dMk.setMarkers(mk);
     $('rt-band').setAttribute('aria-pressed', String(S.band));
-    $('rt-d-legend').innerHTML = (S.band ? '<span><i class="bar" style="background:' + upc + '55"></i>红色底色：当天符合选股条件</span><span><i class="bar" style="background:' + dnc + '40"></i>绿色底色：不符合</span>' : '') + '<span><i style="background:' + css('--ink') + '"></i>MA5</span><span><i style="background:' + css('--accent') + ';height:3px"></i>MA10</span><span><i style="background:' + css('--faint') + '"></i>MA20</span><span>▲上5日：放量站上 5 日线</span><span>●新高：收盘创 60 日新高</span><span>▼破5日：收盘跌破 5 日线</span>';
+    $('rt-d-legend').innerHTML = (S.band ? '<span><i class="bar" style="background:' + upc + '80"></i>深红：买点</span><span><i class="bar" style="background:' + upc + '45"></i>浅红：主升持有</span><span><i class="bar" style="background:' + dnc + '40"></i>绿色：不符合</span>' : '') + '<span><i style="background:' + css('--ink') + '"></i>MA5</span><span><i style="background:' + css('--accent') + ';height:3px"></i>MA10</span><span><i style="background:' + css('--faint') + '"></i>MA20</span><span>▲爆发 / 反包 / 上5日 / 新高 ●低吸：买点类型</span><span>▼破5日：收盘跌破 5 日线</span>';
     if (fit) {
       const fi = S.focus && D.idx.has(S.focus) ? D.idx.get(S.focus) : -1;
       if (fi >= 0) dc.timeScale().setVisibleLogicalRange({ from: Math.max(0, fi - 80), to: Math.min(n + 2, fi + 40) });
@@ -1446,6 +1701,192 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
   $('rt-d-close').addEventListener('click', () => { $('rt-detail').hidden = true; S.detail = null; });
   $('rt-d-star').addEventListener('click', () => { const D = S.detail; if (D) toggleWatch({ id: D.id, code: D.code, name: D.name }); });
 
+
+  // ---------- intraday: 分时 and 30 / 60-minute bars ----------
+  // Times are Beijing clock written as UTC so the axis reads the same in any time zone.
+  const bjTs = (y, mo, d, h, mi) => Date.UTC(y, mo - 1, d, h, mi) / 1000;
+  const nowTs = () => { const t = bj(); return bjTs(+t.year, +t.month, +t.day, +t.hour, +t.minute); };
+  const ISYM = {
+    A: { name: '全A', bk: '883957' }, Y: { name: '昨成交', bk: '883902' }, H: { name: '热股', bk: '883910' },
+    sh: { name: '上证', secid: '1.000001' }, kc50: { name: '科创50', secid: '1.000688' }, cyb: { name: '创业板指', secid: '0.399006' }
+  };
+  const sinaSym = secid => { const [m, c] = secid.split('.'); return (m === '1' ? 'sh' : /^(8|4|92)/.test(c) && !/^399/.test(c) ? 'bj' : 'sz') + c; };
+  function sinaK(sym, scale, len) {
+    const cb = 'rtsk_' + (++seq) + '_' + Date.now().toString(36);
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script'); const t = setTimeout(() => { done(); reject(new Error('超时')); }, 9000);
+      const done = () => { clearTimeout(t); window[cb] = undefined; s.remove(); };
+      window[cb] = d => { done(); resolve(d || []); }; s.onerror = () => { done(); reject(new Error('加载失败')); };
+      s.referrerPolicy = 'no-referrer';
+      s.src = 'https://quotes.sina.cn/cn/api/jsonp_v2.php/' + cb + '/CN_MarketDataService.getKLineData?symbol=' + sym + '&scale=' + scale + '&ma=no&datalen=' + len;
+      document.head.appendChild(s);
+    }).then(rows => rows.map(r => { const m = r.day.match(/(\d+)-(\d+)-(\d+) (\d+):(\d+)/); return { time: bjTs(+m[1], +m[2], +m[3], +m[4], +m[5]), o: +r.open, h: +r.high, l: +r.low, c: +r.close, v: +r.volume, a: +r.amount }; }));
+  }
+  async function thsMinK(bk, scale) {
+    const p = scale === 30 ? '42' : '52';
+    const d = await ths('v4/line/bk_' + bk + '/' + p + '/last.js', 'quotebridge_v4_line_bk_' + bk + '_' + p + '_last');
+    return String((d && d.data) || '').split(';').filter(Boolean).map(r => { const x = r.split(','), z = x[0]; return { time: bjTs(+z.slice(0, 4), +z.slice(4, 6), +z.slice(6, 8), +z.slice(8, 10), +z.slice(10, 12)), o: +x[1], h: +x[2], l: +x[3], c: +x[4], v: +x[5], a: +x[6] }; });
+  }
+  async function minK(key, scale) {
+    const s = ISYM[key];
+    if (s && s.bk) return thsMinK(s.bk, scale);
+    return sinaK(sinaSym(s ? s.secid : key), scale, 480);
+  }
+  async function fenshi(key) {
+    const s = ISYM[key];
+    if (s && s.bk) {
+      const d = await ths('v4/time/bk_' + s.bk + '/last.js', 'quotebridge_v4_time_bk_' + s.bk + '_last');
+      const q = d && d['bk_' + s.bk]; if (!q) throw new Error('无数据');
+      const y = +q.date.slice(0, 4), mo = +q.date.slice(4, 6), dd = +q.date.slice(6, 8);
+      const pts = String(q.data || '').split(';').filter(Boolean).map(r => { const x = r.split(','); return { time: bjTs(y, mo, dd, +x[0].slice(0, 2), +x[0].slice(2, 4)), p: +x[1], a: +x[2], v: +x[4] }; });
+      let sa = 0, sp = 0; pts.forEach((x, i) => { sp += x.p; x.avg = sp / (i + 1); });   // index: plain running average of the line
+      return { pre: +q.pre, date: q.date, pts, avgLabel: '均值线' };
+    }
+    const secid = s ? s.secid : key;
+    try {
+      const d = await jsonpR('https://push2.eastmoney.com/api/qt/stock/trends2/get?secid=' + secid + '&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55,f56,f57,f58&iscr=0&ndays=1');
+      const D = d && d.data; if (!D || !D.trends || !D.trends.length) throw new Error('无数据');
+      const pts = D.trends.map(r => { const x = r.split(','), m = x[0].match(/(\d+)-(\d+)-(\d+) (\d+):(\d+)/); return { time: bjTs(+m[1], +m[2], +m[3], +m[4], +m[5]), p: +x[2], v: +x[5], a: +x[6], avg: +x[7] }; });
+      return { pre: +D.preClose, date: D.trends[0].slice(0, 10).replace(/-/g, ''), pts, avgLabel: s ? '均值线' : '均价线' };
+    } catch (e) {
+      const code = secid.split('.')[1];
+      const d = await ths('v6/time/hs_' + code + '/last.js', 'quotebridge_v6_time_hs_' + code + '_last');
+      const q = d && d['hs_' + code]; if (!q) throw e;
+      const y = +q.date.slice(0, 4), mo = +q.date.slice(4, 6), dd = +q.date.slice(6, 8);
+      const pts = String(q.data || '').split(';').filter(Boolean).map(r => { const x = r.split(','); return { time: bjTs(y, mo, dd, +x[0].slice(0, 2), +x[0].slice(2, 4)), p: +x[1], a: +x[2], avg: +x[3], v: +x[4] }; });
+      return { pre: +q.pre, date: q.date, pts, avgLabel: '均价线' };
+    }
+  }
+  // 超跌线: RSI of the open/close midpoint, smoothed like 通达信 SMA(x,12,1)
+  function fxOf(bars) {
+    const N = 12, out = []; let a = NaN, b = NaN, prev = NaN;
+    bars.forEach((x, i) => {
+      const cm = (x.o + x.c) / 2;
+      if (i) { const d = cm - prev, up = Math.max(d, 0), ab = Math.abs(d); a = isNaN(a) ? up : (up + (N - 1) * a) / N; b = isNaN(b) ? ab : (ab + (N - 1) * b) / N; }
+      prev = cm; out.push(i >= N && b ? a / b * 100 : NaN);
+    });
+    return out;
+  }
+  const smaN = (A, n) => A.map((_, i) => { if (i < n - 1) return NaN; let s2 = 0; for (let j = i - n + 1; j <= i; j++) s2 += A[j]; return s2 / n; });
+  function makeIntra(elId) {
+    const el2 = $(elId);
+    const ch = LWC.createChart(el2, {
+      autoSize: true,
+      layout: { background: { type: 'solid', color: css('--panel') }, textColor: css('--muted'), fontFamily: css('--font-data'), fontSize: 11, attributionLogo: false, panes: { separatorColor: css('--line'), separatorHoverColor: css('--line'), enableResize: true } },
+      grid: { vertLines: { color: css('--line') }, horzLines: { color: css('--line') } },
+      rightPriceScale: { borderColor: css('--line') },
+      timeScale: { borderColor: css('--line'), timeVisible: true, secondsVisible: false, rightOffset: 2, minBarSpacing: 1 },
+      crosshair: { mode: LWC.CrosshairMode.Normal },
+      localization: { locale: 'zh-CN', timeFormatter: t => { const d = new Date(t * 1000); return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + ' ' + String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); } },
+      handleScroll: { vertTouchDrag: false }
+    });
+    const pP = { type: 'price', precision: 2, minMove: 0.01 }, quiet = { priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false };
+    const o = { ch, el: el2 };
+    o.price = ch.addSeries(LWC.LineSeries, { lineWidth: 2, priceFormat: pP, priceLineVisible: false }, 0);
+    o.avg = ch.addSeries(LWC.LineSeries, Object.assign({ lineWidth: 1, lineStyle: 2, priceFormat: pP }, quiet), 0);
+    o.candle = ch.addSeries(LWC.CandlestickSeries, { priceFormat: pP, priceLineVisible: false }, 0);
+    o.ma5 = ch.addSeries(LWC.LineSeries, Object.assign({ lineWidth: 1, priceFormat: pP }, quiet), 0);
+    o.vol = ch.addSeries(LWC.HistogramSeries, { priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false }, 1);
+    o.fx = ch.addSeries(LWC.LineSeries, { lineWidth: 2, priceFormat: { type: 'price', precision: 1, minMove: 0.1 }, priceLineVisible: false, crosshairMarkerVisible: false, autoscaleInfoProvider: () => ({ priceRange: { minValue: 0, maxValue: 100 } }) }, 2);
+    o.mk = LWC.createSeriesMarkers(o.candle, []);
+    o.lines = [];
+    const ps = ch.panes(); if (ps[2] && ps[0].setStretchFactor) { ps[0].setStretchFactor(3); ps[1].setStretchFactor(0.9); ps[2].setStretchFactor(1.1); }
+    return o;
+  }
+  function paintIntra(o) {
+    if (!o) return;
+    o.ch.applyOptions({ layout: { background: { type: 'solid', color: css('--panel') }, textColor: css('--muted') }, grid: { vertLines: { color: css('--line') }, horzLines: { color: css('--line') } }, rightPriceScale: { borderColor: css('--line') }, timeScale: { borderColor: css('--line') } });
+    const u = css('--up'), d = css('--down');
+    o.candle.applyOptions({ upColor: u, downColor: d, borderUpColor: u, borderDownColor: d, wickUpColor: u, wickDownColor: d });
+    o.ma5.applyOptions({ color: css('--ink') }); o.avg.applyOptions({ color: css('--rsrs') }); o.fx.applyOptions({ color: css('--fx') });
+  }
+  // 分时 has no 超跌线 pane: shrink it to nothing; 30 / 60 bring it back
+  function setPanes(o, fs) {
+    const ps = o.ch.panes(); if (!ps[2] || !ps[0].setStretchFactor) return;
+    ps[0].setStretchFactor(3); ps[1].setStretchFactor(fs ? 0.8 : 0.9); ps[2].setStretchFactor(fs ? 0.06 : 1.1);
+    // (the 超跌线 axis stays; with no data it is blank)
+  }
+  function clearLines(o) { o.lines.forEach(([s2, l]) => s2.removePriceLine(l)); o.lines = []; }
+  // draws one of: 'fs' (分时), 30 or 60; returns a short legend html
+  async function drawIntra(o, key, mode, fit) {
+    paintIntra(o); clearLines(o);
+    const u = css('--up'), d = css('--down');
+    if (mode === 'fs') {
+      const F = await fenshi(key), last = F.pts[F.pts.length - 1];
+      o.candle.setData([]); o.ma5.setData([]); o.fx.setData([]); o.mk.setMarkers([]);
+      const col = last && last.p >= F.pre ? u : d;
+      o.price.applyOptions({ color: col, visible: true }); o.avg.applyOptions({ visible: true });
+      o.price.setData(F.pts.map(x => ({ time: x.time, value: x.p })));
+      o.avg.setData(F.pts.filter(x => ok(x.avg) && x.avg > 0).map(x => ({ time: x.time, value: x.avg })));
+      o.vol.setData(F.pts.map((x, i) => ({ time: x.time, value: x.v, color: (i && x.p >= F.pts[i - 1].p ? u : d) + '99' })));
+      o.lines.push([o.price, o.price.createPriceLine({ price: F.pre, color: css('--faint'), lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '昨收' })]);
+      setPanes(o, true);
+      if (fit) o.ch.timeScale().fitContent();
+      const chg = last ? last.p / F.pre - 1 : NaN;
+      return '<span>' + F.date.slice(4, 6) + '/' + F.date.slice(6, 8) + ' 分时</span><span>最新 <b class="' + cls(chg) + '">' + (last ? last.p.toFixed(2) : '—') + ' ' + pct(chg) + '</b></span><span><i style="background:' + css('--rsrs') + '"></i>' + F.avgLabel + '</span><span>虚线：昨收</span>';
+    }
+    const scale = mode, bars = await minK(key, scale);
+    if (!bars.length) throw new Error('无数据');
+    const now = nowTs(), done = bars.map(b => b.time <= now);
+    const C = bars.map(b => b.c), m5 = smaN(C, 5), fx = fxOf(bars);
+    setPanes(o, false);
+    o.price.setData([]); o.avg.setData([]); o.price.applyOptions({ visible: false }); o.avg.applyOptions({ visible: false });
+    o.candle.setData(bars.map(b => ({ time: b.time, open: b.o, high: b.h, low: b.l, close: b.c })));
+    o.ma5.setData(bars.map((b, i) => ok(m5[i]) ? { time: b.time, value: m5[i] } : { time: b.time }));
+    o.vol.setData(bars.map((b, i) => ({ time: b.time, value: b.v, color: (i && b.c >= bars[i - 1].c ? u : d) + '99' })));
+    o.fx.setData(bars.map((b, i) => ok(fx[i]) ? { time: b.time, value: fx[i] } : { time: b.time }));
+    [[30, css('--muted'), '超卖 30'], [20, css('--teal'), '20']].forEach(([v, c, t]) => o.lines.push([o.fx, o.fx.createPriceLine({ price: v, color: c, lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: t })]));
+    const mk = [];
+    let note = '';
+    if (scale === 60) {
+      for (let i = 1; i < bars.length; i++) if (done[i] && fx[i] < 30 && !(fx[i - 1] < 30)) mk.push({ time: bars[i].time, position: 'belowBar', color: css('--teal'), shape: 'circle', text: '超跌' });
+      note = '<span>●超跌：60 分钟超跌线跌破 30（小时线超跌）</span>';
+    } else {
+      // 企稳：60 分钟超跌后，30 分钟收盘重新站上 MA5（两根都按走完的 K 线算）
+      let b60 = []; try { b60 = await minK(key, 60); } catch (e) {}
+      const fx60 = fxOf(b60), over = b60.filter((b, i) => b.time <= now && fx60[i] < 30).map(b => b.time);
+      for (let i = 1; i < bars.length; i++) {
+        if (!done[i] || !(C[i] > m5[i]) || !(C[i - 1] <= m5[i - 1])) continue;
+        const t0 = over.filter(t => t <= bars[i].time).pop();
+        if (t0 == null) continue;
+        const gap = bars.filter(b => b.time > t0 && b.time <= bars[i].time).length;
+        if (gap <= 16) mk.push({ time: bars[i].time, position: 'belowBar', color: css('--up'), shape: 'arrowUp', text: '企稳' });
+      }
+      note = '<span>▲企稳：小时线超跌后，30 分钟收盘重新站上 MA5</span>';
+    }
+    if (!done[done.length - 1]) mk.push({ time: bars[bars.length - 1].time, position: 'aboveBar', color: css('--faint'), shape: 'square', text: '未走完' });
+    o.mk.setMarkers(mk);
+    if (fit) o.ch.timeScale().setVisibleLogicalRange({ from: Math.max(0, bars.length - (scale === 30 ? 64 : 48)), to: bars.length + 2 });
+    return '<span>' + scale + ' 分钟</span><span><i style="background:' + css('--ink') + '"></i>MA5</span><span><i style="background:' + css('--fx') + '"></i>超跌线（下方副图）</span>' + note + '<span>只认走完的 K 线</span>';
+  }
+  const IN = { key: store.get('rt-i-key') || 'A', mode: store.get('rt-i-mode') || 'fs', o: null, busy: false };
+  if (!ISYM[IN.key]) IN.key = 'A';
+  if (!['fs', '30', '60'].includes(IN.mode)) IN.mode = 'fs';
+  async function intraRender(fit) {
+    if (IN.busy) return; IN.busy = true;
+    if (!IN.o) IN.o = makeIntra('rt-i-chart');
+    [...$('rt-i-sym').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.k === IN.key)));
+    [...$('rt-i-tf').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === IN.mode)));
+    try { $('rt-i-legend').innerHTML = await drawIntra(IN.o, IN.key, IN.mode === 'fs' ? 'fs' : +IN.mode, fit); $('rt-i-err').textContent = ''; }
+    catch (e) { $('rt-i-err').textContent = ISYM[IN.key].name + '的' + (IN.mode === 'fs' ? '分时' : IN.mode + ' 分钟线') + '暂时没拉到，稍后会自动重试。'; }
+    IN.busy = false;
+  }
+  $('rt-i-sym').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; IN.key = b.dataset.k; store.set('rt-i-key', IN.key); intraRender(true); });
+  $('rt-i-tf').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (!b) return; IN.mode = b.dataset.m; store.set('rt-i-mode', IN.mode); intraRender(true); });
+  // the stock detail card: 日K / 分时 / 30分 / 60分
+  const DI = { mode: 'D', o: null };
+  async function detailTf(m, fit) {
+    DI.mode = m;
+    [...$('rt-d-tf').children].forEach(b => b.setAttribute('aria-pressed', String(b.dataset.m === m)));
+    const intra = m !== 'D';
+    $('rtchart').hidden = intra; $('rt-di-chart').hidden = !intra; $('rt-band-row').hidden = intra;
+    $('rt-d-legend').hidden = intra; $('rt-di-legend').hidden = !intra;
+    if (!intra || !S.detail) return;
+    if (!DI.o) DI.o = makeIntra('rt-di-chart');
+    try { $('rt-di-legend').innerHTML = await drawIntra(DI.o, S.detail.id, m === 'fs' ? 'fs' : +m, fit); }
+    catch (e) { $('rt-di-legend').innerHTML = '<span>这只股票的' + (m === 'fs' ? '分时' : m + ' 分钟线') + '暂时没拉到，稍后再试。</span>'; }
+  }
+  $('rt-d-tf').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (b) detailTf(b.dataset.m, true); });
   // ---------- refresh loop ----------
   $('rt-s-mode').addEventListener('click', e => { const b = e.target.closest('button[data-m]'); if (!b) return; S.mode = b.dataset.m; store.set('rt-mode', S.mode); [...$('rt-s-mode').children].forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderScan(); });
   [...$('rt-s-mode').children].forEach(x => x.setAttribute('aria-pressed', String(x.dataset.m === S.mode)));
@@ -1462,13 +1903,15 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
       renderScan();
     }
     if (S.detail) { try { await openDetailQuiet(); } catch (e) {} }
+    try { await intraRender(full); } catch (e) {}
+    if (S.detail && DI.mode !== 'D') { try { await detailTf(DI.mode, false); } catch (e) {} }
     status((errs.length ? '部分数据没拉到（' + errs.join('；') + '）· ' : '') + '更新于北京时间 ' + bj().hms + ' · ' + SESS_TXT[session()], errs.length > 0);
     S.busy = false;
   }
   async function openDetailQuiet() {
     const D = S.detail; if (!D || D.short) return;
-    const k = await emKline(D.id, 750); const P = prep(k.bars), i = k.bars.length - 1;
-    const sess = session(), r = evalAt(k.bars, P, i, D.code, D.name); if (r) r.live = (sess === 'open' || sess === 'noon') && k.bars[i].t === bj().date;
+    const k = await emKline(D.id, 750), i = k.bars.length - 1;
+    const sess = session(), { P, r } = evalBars(k.bars, D); if (r) r.live = (sess === 'open' || sess === 'noon') && k.bars[i].t === bj().date;
     Object.assign(D, { bars: k.bars, P, r, idx: new Map(k.bars.map((b, j) => [b.t, j])) }); drawDetail(false);
   }
   function schedule() {
@@ -1497,9 +1940,31 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
     onShow() { RT.visible = true; RT.brand(true); if (!S.started) { S.started = true; renderWatch(); renderScan(); refresh(true).then(schedule); } else { schedule(); } },
     onHide() { RT.visible = false; RT.brand(false); },
     brand(on) { const bd = document.querySelector('.brand-date'); if (!bd) return; let x = document.getElementById('brand-rt'); if (!x) { x = document.createElement('span'); x.id = 'brand-rt'; x.className = 'brand-date'; x.textContent = '实时行情 · 北京时间'; bd.after(x); } bd.hidden = on; x.hidden = !on; },
-    theme() { paintChart(); }
+    theme() { paintChart(); paintIntra(IN.o); paintIntra(DI.o); }
   };
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => RT.theme()); } catch (e) {}
+  // ---------- glass + motion ----------
+  (function glass() {
+    const f = document.createElement('div'); f.className = 'glass-field'; f.setAttribute('aria-hidden', 'true'); f.innerHTML = '<i></i><i></i><i></i><i></i>';
+    document.body.prepend(f);
+    // a pill that slides to the selected tab
+    const tabs = document.querySelector('.tabs');
+    if (tabs) {
+      const ind = document.createElement('span'); ind.className = 'tab-ind'; tabs.prepend(ind); tabs.classList.add('has-ind');
+      const move = () => { const b = tabs.querySelector('button[aria-selected="true"]'); if (!b) return; ind.style.width = b.offsetWidth + 'px'; ind.style.transform = 'translateX(' + b.offsetLeft + 'px)'; };
+      new MutationObserver(move).observe(tabs, { subtree: true, attributes: true, attributeFilter: ['aria-selected'] });
+      addEventListener('resize', move); if (document.fonts && document.fonts.ready) document.fonts.ready.then(move);
+      requestAnimationFrame(() => { ind.style.transition = 'none'; move(); requestAnimationFrame(() => { ind.style.transition = ''; }); });
+    }
+    // cards float in the first time each view is shown
+    const seen = new Set();
+    const enter = v => {
+      if (v.hidden || seen.has(v.id)) return; seen.add(v.id);
+      [...v.querySelectorAll('.card, .ds-hero, .cond, .conds-wrap, .rt-thermo')].forEach((c, i) => c.style.setProperty('--i', Math.min(i, 12)));
+      v.classList.add('enter'); setTimeout(() => v.classList.remove('enter'), 1600);
+    };
+    document.querySelectorAll('.view').forEach(v => { enter(v); new MutationObserver(() => enter(v)).observe(v, { attributes: true, attributeFilter: ['hidden'] }); });
+  })();
   new MutationObserver(() => RT.theme()).observe(root, { attributes: true, attributeFilter: ['data-theme', 'class'] });
 })();
 
