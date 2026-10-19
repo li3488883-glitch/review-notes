@@ -7,10 +7,11 @@
 import sys, os, json, time, datetime, glob
 import numpy as np
 
-POOL, KEEP, NB, NV, NO = 200, 1800, 61, 30, 11
+POOL, KEEP, NB, NV, NO = 200, 1800, 66, 66, 11
 BACKFILL_START = '2009-06-01'
 PICKS_FROM = '2010-01-04'
-BITS = ['above5', 'up5', 'bias', 'notLimDn', 'heap', 'nearHigh', 'reclaim', 'pull5', 'pull10', 'newHigh', 'extreme']
+BITS = ['ma5', 'high', 'vol', 'trend', 'burst', 'dip', 'fanbao', 'reclaim', 'newHigh', 'notLimDn', 'rs', 'kd', 'lead', 'extreme', 'tech']
+INDEX = {'kc': 'sh.000688', 'cy': 'sz.399006', 'sh': 'sh.000001'}
 
 def bjtoday():
     return (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=8)).date()
@@ -34,44 +35,78 @@ def shift(a, k):
         out[k:] = a[:len(a) - k]
     return out
 
-def evaluate(code, d, O, H, L, C, V):
+def is_tech(code, ind):
+    # 科技：科创板，或者证监会行业是电子/通信（C39）、软件和信息技术服务（I63–I65）；创业板里的专用设备、仪器仪表也算
+    ind = ind or ''
+    return code[:3] in ('688', '689') or ind[:3] in ('C39', 'I63', 'I64', 'I65') or (code[:3] in ('300', '301') and ind[:3] in ('C35', 'C40'))
+
+def since_high(H):
+    # days since the last bar whose high tops the 19 bars before it (looking back at most 30 bars, from bar 20 on)
+    n = len(H)
+    prev19 = shift(roll(H, 19, np.max), 1)
+    is_hi = (H >= prev19) & (np.arange(n) >= 20)
+    idx = np.where(is_hi, np.arange(n), -1)
+    last = np.maximum.accumulate(idx)
+    out = np.arange(n) - last
+    out[(last < 0) | (out > 30)] = 30
+    return out
+
+def evaluate(code, d, O, H, L, C, V, I):
+    """Same rules as the page's evalAt (rt.js). I: the stock's gate index close on each of its dates (NaN if missing)."""
     n = len(C)
     m5, m10, m20 = roll(C, 5, np.mean), roll(C, 10, np.mean), roll(C, 20, np.mean)
-    m5p = shift(m5, 1)
+    A = V * C
+    a10, a60 = roll(A, 10, np.mean), roll(A, 60, np.mean)
     v5 = roll(V, 5, np.mean)
-    v20 = shift(roll(V, 20, np.mean), 5)
-    hi60 = roll(H, 60, np.max)
+    pc, m5p = shift(C, 1), shift(m5, 1)
+    aprev5 = shift(roll(A, 5, np.mean), 1)
+    sh = since_high(H)
+    c20p = shift(roll(C, 20, np.max), 1)
     c60p = shift(roll(C, 60, np.max), 1)
-    pc = shift(C, 1)
+    hi60 = roll(H, 60, np.max)
     with np.errstate(invalid='ignore', divide='ignore'):
         chg = C / pc - 1
-        lim = np.where(np.char.startswith(np.full(n, code), '688'), 0.2,
-              np.where(np.char.startswith(np.full(n, code), '30') & (d >= 20200824), 0.2, 0.1))
+        lim = np.where(np.full(n, code[:3] in ('688', '689')), 0.2, np.where(np.full(n, code[:2] == '30') & (d >= 20200824), 0.2, 0.1))
         limdn = chg <= -(lim - 0.002)
         f = {}
-        f['above5'] = C > m5
-        f['up5'] = m5 > m5p
-        f['bias'] = C / m5 - 1 <= 0.08
-        f['notLimDn'] = ~limdn
-        f['heap'] = v5 >= 1.2 * v20
-        up = (m5 > m10) & (m10 > m20) & (m20 > shift(m20, 5))
+        f['ma5'] = C >= m5
+        f['high'] = sh <= 3
+        f['vol'] = a10 >= a60
+        f['trend'] = (m5 > m20) & (m20 >= shift(m20, 5))
+        hold = f['ma5'] & f['high'] & f['vol'] & f['trend']
+        prevhold = np.r_[False, hold[:-1]]
+        f['burst'] = (chg >= np.where(lim >= 0.2, 0.07, 0.05)) & (A >= 1.5 * aprev5) & ((C > c20p) | (pc < m5p)) & (C >= H * 0.97)
+        f['dip'] = prevhold & (chg <= 0.02) & ((L <= m5 * 1.01) | (L <= m10 * 1.01)) & (C >= m10) & ~limdn
+        o1 = shift(O, 1)
+        f['fanbao'] = (pc / shift(C, 2) - 1 <= -0.03) & (pc < o1) & (C > o1) & (C >= m5)
         f['reclaim'] = (pc <= m5p) & (C > m5) & (V >= 1.5 * shift(V, 1))
-        p5 = (L <= m5 * 1.01) & (C >= m5)
-        f['pull5'] = up & p5
-        f['pull10'] = up & (L <= m10 * 1.01) & (C >= m10) & ~p5
-        f['newHigh'] = C > c60p
-        f['nearHigh'] = C >= 0.97 * hi60
+        f['newHigh'] = (C > c60p) & (A >= 1.2 * aprev5) & (np.r_[0, sh[:-1]] >= 2)
+        f['notLimDn'] = ~limdn
+        ixok = np.isfinite(I) & np.isfinite(shift(I, 20))
+        f['rs'] = ixok & (C / shift(C, 20) - 1 > I / shift(I, 20) - 1)
+        ichg = I / shift(I, 1) - 1
+        anti = np.nan_to_num(((ichg <= -0.01) & (chg >= -0.005)).astype(float), nan=0)
+        f['kd'] = ixok & (C >= m5) & (roll(anti, 10, np.max) > 0)
+        f['lead'] = ixok & (C > c60p) & (I < 0.98 * roll(np.nan_to_num(I, nan=-np.inf), 21, np.max))
         vmax = roll(np.nan_to_num(v5, nan=0.0), 500, np.max)
         vmax[:499] = np.maximum.accumulate(np.nan_to_num(v5, nan=0.0))[:499]
         f['extreme'] = (v5 >= vmax * 0.999) & (np.arange(n) >= 120)
-        must = ['above5', 'up5', 'bias', 'notLimDn', 'heap']
-        fails = sum((~f[k]).astype(np.int8) for k in must) + (~(f['nearHigh'] | f['reclaim'] | f['pull5'] | f['pull10'] | f['newHigh'])).astype(np.int8)
+        f['tech'] = np.zeros(n, dtype=bool)
+        fails = sum((~f[k]).astype(np.int8) for k in ('ma5', 'high', 'vol', 'trend'))
         ret20 = C / shift(C, 20) - 1
     flags = np.zeros(n, dtype=np.uint16)
     for b, k in enumerate(BITS):
         flags |= (np.nan_to_num(f[k].astype(float), nan=0).astype(np.uint16) << b)
-    valid = np.arange(n) >= 60
+    valid = np.arange(n) >= 64
     return flags, fails.astype(np.int8), chg, ret20, valid
+
+def state_of(flags):
+    """'b' 买点 / 'h' 主升持有 / '' 都不是 — from the flag bits (same as the page)."""
+    fl = lambda k: (flags >> BITS.index(k)) & 1
+    trig = fl('burst') | fl('dip') | fl('fanbao') | fl('reclaim') | fl('newHigh')
+    buy = trig & fl('notLimDn') & fl('ma5')
+    hold = fl('ma5') & fl('high') & fl('vol') & fl('trend')
+    return np.where(buy == 1, 2, np.where(hold == 1, 1, 0))
 
 def shard(k, N, mode):
     import baostock as bs
@@ -95,8 +130,25 @@ def shard(k, N, mode):
         start = str(datetime.date.fromisoformat(D) - datetime.timedelta(days=800))
     codes = codes[k::N]
     print('shard', k, 'of', N, mode, 'date', D, 'stocks', len(codes), flush=True)
+    # 证监会行业 (latest), used to tell 科技 from the rest
+    inds = {}
+    try:
+        for r in rows(bs.query_stock_industry()):
+            inds[r[1]] = (r[3] or '')[:3]
+    except Exception as e:
+        print('industry failed', e, flush=True)
+    # gate indices: 科创50 (from 2019-12), 创业板指, 上证
+    ix = {}
+    for key, icode in INDEX.items():
+        rr = rows(bs.query_history_k_data_plus(icode, 'date,close', start_date=start, end_date=D, frequency='d'))
+        ix[key] = {int(r[0].replace('-', '')): float(r[1]) for r in rr if r[1]}
+    def gate_series(dd, tech):
+        if not tech:
+            return np.array([ix['sh'].get(int(x), np.nan) for x in dd])
+        return np.array([ix['kc'].get(int(x), ix['cy'].get(int(x), np.nan)) for x in dd])
     keep = {key: [] for key in ('d', 'id', 'amt', 'turn', 'flags', 'fails', 'chg', 'ret20')}
     base, names = {}, {}
+    mkt = {}          # date -> [all-stock turnover, 科技 turnover, n stocks, n up]
     t0 = time.time()
     for j, (code, name) in enumerate(codes):
         if j % 200 == 0:
@@ -120,16 +172,27 @@ def shard(k, N, mode):
                 bars.append((int(r[0].replace('-', '')), float(r[1]), float(r[2]), float(r[3]), float(r[4]), float(r[5]) / 100.0, float(r[6] or 0), float(r[7] or 0), r[9] == '1'))
             except ValueError:
                 continue
-        if len(bars) < 61:
+        if len(bars) < NB:
             continue
         a = np.array([b[:8] for b in bars], dtype=float)
         st = np.array([b[8] for b in bars])
         d = a[:, 0].astype(np.int64)
         O, H, L, C, V, A, T = a[:, 1], a[:, 2], a[:, 3], a[:, 4], a[:, 5], a[:, 6], a[:, 7]
-        flags, fails, chg, ret20, valid = evaluate(code[3:], d, O, H, L, C, V)
+        tech = is_tech(code[3:], inds.get(code))
+        flags, fails, chg, ret20, valid = evaluate(code[3:], d, O, H, L, C, V, gate_series(d, tech))
+        if tech:
+            flags |= np.uint16(1 << BITS.index('tech'))
         sid = ('1.' if code.startswith('sh') else '0.') + code[3:]
         names[sid] = name
         m = valid & ~st & (A > 0)
+        for x, a_, c_ in zip(d[~st & (A > 0)], A[~st & (A > 0)], chg[~st & (A > 0)]):
+            t = mkt.setdefault(int(x), [0.0, 0.0, 0, 0])
+            t[0] += a_
+            if tech:
+                t[1] += a_
+            t[2] += 1
+            if c_ > 0:
+                t[3] += 1
         for key, arr in (('d', d), ('amt', A), ('turn', T), ('flags', flags), ('fails', fails), ('chg', chg), ('ret20', ret20)):
             keep[key].append(arr[m])
         keep['id'].append(np.full(m.sum(), sid, dtype='U9'))
@@ -148,6 +211,7 @@ def shard(k, N, mode):
                 'n': name,
                 'd': [f'{x // 10000:04d}-{x // 100 % 100:02d}-{x % 100:02d}' for x in d[last]],
                 'a20': float(A[-20:].mean()),
+                'g': inds.get(code, ''),
             }
     bs.logout()
     os.makedirs('out', exist_ok=True)
@@ -162,7 +226,8 @@ def shard(k, N, mode):
         cat = {key: v[sel] for key, v in cat.items()}
     np.savez_compressed(f'out/shard_{k}.npz', **cat)
     with open(f'out/base_{k}.json', 'w', encoding='utf-8') as fh:
-        json.dump({'D': D, 'base': base, 'names': names}, fh, ensure_ascii=False)
+        json.dump({'D': D, 'base': base, 'names': names, 'inds': {('1.' if c.startswith('sh') else '0.') + c[3:]: v for c, v in inds.items()},
+                   'ix': {key: {str(x): v for x, v in ser.items()} for key, ser in ix.items()}, 'mkt': {str(x): v for x, v in mkt.items()}}, fh, ensure_ascii=False)
     print('shard done', k, len(cat['d']), 'rows', round(time.time() - t0), 's', flush=True)
 
 def combine(mode):
@@ -171,10 +236,29 @@ def combine(mode):
         sys.exit('no shards')
     parts = [np.load(p) for p in shards]
     cat = {key: np.concatenate([p[key] for p in parts]) for key in parts[0].files}
-    bases, names, D = {}, {}, None
+    bases, names, inds, ix, mkt, D = {}, {}, {}, {}, {}, None
     for p in sorted(glob.glob('out/base_*.json')):
         j = json.load(open(p, encoding='utf-8'))
         bases.update(j['base']); names.update(j['names']); D = j['D'] or D
+        inds.update(j.get('inds', {}))
+        for key, ser in j.get('ix', {}).items():
+            if len(ser) > len(ix.get(key, {})):
+                ix[key] = ser
+        for x, v in j.get('mkt', {}).items():
+            t = mkt.setdefault(int(x), [0.0, 0.0, 0, 0])
+            for q in range(4):
+                t[q] += v[q]
+    # gate index levels per day: 2 = 收盘在 10 日线上（共振），1 = 只在 5 日线上，0 = 5 日线下
+    gates = {}
+    for key, ser in ix.items():
+        ds = sorted(int(x) for x in ser)
+        cl = np.array([ser[str(x)] for x in ds])
+        m5, m10 = roll(cl, 5, np.mean), roll(cl, 10, np.mean)
+        for q, x in enumerate(ds):
+            if q >= 9:
+                lv = 2 if cl[q] >= m10[q] else 1 if cl[q] >= m5[q] else 0
+                gates.setdefault(x, {})[key] = [lv, round((cl[q] / cl[q - 1] - 1) * 100, 2)]
+    bit = {k: 1 << b for b, k in enumerate(BITS)}
     # per day: global top 200 by turnover, rank by 20-day return inside that pool
     order = np.lexsort((-cat['amt'], cat['d']))
     for key in cat:
@@ -192,14 +276,31 @@ def combine(mode):
         r20 = cat['ret20'][idx]
         rk = np.empty(len(idx), dtype=int)
         rk[np.argsort(-np.nan_to_num(r20, nan=-9e9), kind='stable')] = np.arange(1, len(idx) + 1)
+        ids = [str(x) for x in cat['id'][idx]]
+        st = state_of(cat['flags'][idx].astype(np.int64))
+        # 主线：成交额前 40 里，同一个行业有 3 只以上，并且是数量最多的两个行业之一
+        cnt = {}
+        for sid in ids[:40]:
+            g = inds.get(sid, '')
+            if g:
+                cnt[g] = cnt.get(g, 0) + 1
+        top2 = sorted(cnt.items(), key=lambda kv: -kv[1])[:3]
+        main = {g for g, c in top2[:2] if c >= 3}
+        # 大马拉小车：成交额前 100 里，换手率排在前三成
+        t100 = np.array([float(x) for x in cat['turn'][idx][:100]])
+        dm_cut = np.nanpercentile(t100, 70) if len(t100) >= 10 else np.inf
         recs = []
         for q, i in enumerate(idx):
             fl = int(cat['fails'][i])
-            if fl > 1:
+            if st[q] == 0 and fl > 1:
                 continue
-            recs.append([str(cat['id'][i]), round(float(cat['chg'][i]) * 100, 2), round(float(cat['amt'][i]) / 1e8, 2), round(float(cat['turn'][i]), 2), int(cat['flags'][i]), int(rk[q]), fl])
+            x = (1 if q < 100 and float(cat['turn'][i]) >= dm_cut else 0) | (2 if inds.get(ids[q], '') in main else 0)
+            recs.append([ids[q], round(float(cat['chg'][i]) * 100, 2), round(float(cat['amt'][i]) / 1e8, 2), round(float(cat['turn'][i]), 2), int(cat['flags'][i]), int(rk[q]), fl, x])
         key = f'{day // 10000:04d}-{day // 100 % 100:02d}-{day % 100:02d}'
-        days[key] = {'n': len(idx), 'r': recs}
+        mk = mkt.get(day)
+        c100 = cat['chg'][idx][:100]
+        days[key] = {'n': len(idx), 'r': recs, 'g': gates.get(day, {}), 'ms': [[g, c] for g, c in top2],
+                     'm': ({'amt': round(mk[0] / 1e8), 'ts': round(mk[1] / mk[0] * 100, 1) if mk[0] else 0, 'up': int(mk[3]), 'cnt': int(mk[2]), 'u100': int(np.sum(c100 > 0))} if mk else {})}
     keys = sorted(days)
     if mode != 'backfill':
         keys = keys[-30:]          # the daily run refreshes the last 30 trading days
@@ -218,16 +319,18 @@ def combine(mode):
     first = min(json.load(open(f'picks/{allyears[0]}.json', encoding='utf-8')))
     last = max(json.load(open(f'picks/{allyears[-1]}.json', encoding='utf-8')))
     with open(idxp, 'w') as fh:
-        json.dump({'years': allyears, 'first': first, 'last': last, 'bits': BITS}, fh)
+        json.dump({'years': allyears, 'first': first, 'last': last, 'bits': BITS, 'v': 2}, fh)
     # names: keep old names for delisted stocks
     oldn = json.load(open('names.json', encoding='utf-8')) if os.path.exists('names.json') else {}
     oldn.update(names)
     with open('names.json', 'w', encoding='utf-8') as fh:
         json.dump(oldn, fh, ensure_ascii=False, separators=(',', ':'))
+
     # base file for the live page
     top = sorted(bases.items(), key=lambda kv: -kv[1]['a20'])[:KEEP]
     cal = max({tuple(v['d']) for _, v in top}, key=lambda c: sum(1 for _, v in top if tuple(v['d']) == c))
-    out = {'d': D, 'dates': list(cal), 'made': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 's': {}}
+    out = {'d': D, 'dates': list(cal), 'made': datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 's': {}, 'v': 2,
+           'ix': {key: [ser.get(x.replace('-', '')) for x in cal] for key, ser in ix.items()}}
     for sid, v in top:
         v = dict(v); del v['a20']
         if tuple(v['d']) == cal:
