@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- a glass pill with one red candle and one green candle -->
+    <path android:fillColor="#33FFFFFF" android:pathData="M30,40 h48 a14,14 0 0 1 0,28 h-48 a14,14 0 0 1 0,-28 z" />
+    <path android:strokeColor="#CCFFFFFF" android:strokeWidth="1.5" android:pathData="M30,40 h48 a14,14 0 0 1 0,28 h-48 a14,14 0 0 1 0,-28 z" />
+    <path android:fillColor="#FFFF4D55" android:pathData="M44,46 h8 v16 h-8 z" />
+    <path android:strokeColor="#FFFF4D55" android:strokeWidth="1.5" android:pathData="M48,42 v26" />
+    <path android:fillColor="#FF30D17F" android:pathData="M58,50 h8 v10 h-8 z" />
+    <path android:strokeColor="#FF30D17F" android:strokeWidth="1.5" android:pathData="M62,46 v18" />
+</vector>
