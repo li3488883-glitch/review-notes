@@ -1,0 +1,74 @@
+name: app
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APP_VERSION_CODE: ${{ github.run_number }}
+      APP_VERSION_NAME: 0.1.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: unpack an uploaded source bundle (app/src.tgz), commit the files, drop the bundle
+        run: |
+          if [ -f app/src.tgz ]; then
+            tar xzf app/src.tgz
+            git rm -q app/src.tgz
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app
+            git commit -m "app: unpack source bundle"
+            git push
+          fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: signing key (created once, then reused so updates install over the old app)
+        working-directory: app
+        run: |
+          mkdir -p keystore
+          if [ ! -f keystore/release.jks ]; then
+            keytool -genkeypair -v -keystore keystore/release.jks -storepass timing-app -keypass timing-app \
+              -alias timing -keyalg RSA -keysize 2048 -validity 36500 -dname "CN=timing, O=personal, C=CN"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add keystore/release.jks
+            git commit -m "app: signing key"
+            git pull --rebase && git push
+          fi
+      - name: unit tests (rules must match the page)
+        working-directory: app
+        run: gradle :mobile:testReleaseUnitTest --stacktrace
+      - name: build
+        working-directory: app
+        run: gradle :mobile:assembleRelease --stacktrace
+      - name: publish to the app-latest release
+        run: |
+          apk=app/mobile/build/outputs/apk/release/mobile-release.apk
+          cp "$apk" timing-app.apk
+          gh release view app-latest -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create app-latest -R "$GITHUB_REPOSITORY" --title "App 最新版" --notes "手机浏览器打开本页，下载 timing-app.apk 安装。" --latest=false
+          gh release upload app-latest timing-app.apk -R "$GITHUB_REPOSITORY" --clobber
+          notes="版本 0.1.${{ github.run_number }}，$(date -u -d '+8 hours' '+%Y-%m-%d %H:%M') 北京时间打包。手机浏览器打开本页，下载 timing-app.apk 安装（第一次要允许安装未知来源）。"
+          if [ -f app/CHANGELOG.md ]; then notes="$notes
+
+          $(cat app/CHANGELOG.md)"; fi
+          gh release edit app-latest -R "$GITHUB_REPOSITORY" --notes "$notes"
