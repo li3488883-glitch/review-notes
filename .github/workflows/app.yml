@@ -60,6 +60,10 @@ jobs:
       - name: build
         working-directory: app
         run: gradle :mobile:assembleRelease --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: app/mobile/build/outputs/apk/release/mobile-release.apk
       - name: publish to the app-latest release
         run: |
           apk=app/mobile/build/outputs/apk/release/mobile-release.apk
@@ -71,3 +75,39 @@ jobs:
 
           $(cat app/CHANGELOG.md)"; fi
           gh release edit app-latest -R "$GITHUB_REPOSITORY" --notes "$notes"
+
+  # Runs the new APK in an emulator, walks the screens, and posts screenshots + the app log to the app-ci release.
+  shots:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: app/tools
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk
+      - run: mv mobile-release.apk timing-app.apk
+      - name: enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -timezone Asia/Shanghai
+          script: bash app/tools/shots.sh
+      - name: post screenshots
+        if: always()
+        run: |
+          ls shots || exit 0
+          gh release view app-ci -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create app-ci -R "$GITHUB_REPOSITORY" --title "App 自动截图" --notes "云端模拟器自动截图，给开发核对用。" --prerelease
+          gh release upload app-ci shots/* -R "$GITHUB_REPOSITORY" --clobber
