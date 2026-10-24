@@ -18,7 +18,7 @@ android {
 
     signingConfigs {
         create("release") {
-            val ks = file(System.getenv("APP_KEYSTORE") ?: "keystore/release.jks")
+            val ks = rootProject.file(System.getenv("APP_KEYSTORE") ?: "keystore/release.jks")
             if (ks.exists()) {
                 storeFile = ks
                 storePassword = System.getenv("APP_KEYSTORE_PASSWORD") ?: "timing-app"
