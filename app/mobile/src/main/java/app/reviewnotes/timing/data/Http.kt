@@ -23,6 +23,8 @@ object Http {
     suspend fun get(url: String, charset: Charset = Charsets.UTF_8, timeoutMs: Int = 9000): String = gate.withPermit {
         withContext(Dispatchers.IO) {
             val c = URL(url).openConnection() as HttpURLConnection
+            val t0 = System.currentTimeMillis()
+            val tag = url.substringAfter("://").substringBefore("?").take(70)
             try {
                 c.connectTimeout = timeoutMs
                 c.readTimeout = timeoutMs
@@ -31,8 +33,13 @@ object Http {
                 c.setRequestProperty("Accept", "*/*")
                 c.setRequestProperty("Accept-Language", "zh-CN,zh;q=0.9")
                 val code = c.responseCode
-                if (code !in 200..299) throw HttpException(code, url)
-                c.inputStream.use { String(it.readBytes(), charset) }
+                if (code !in 200..299) { android.util.Log.w("TimingNet", "$code ${System.currentTimeMillis() - t0}ms $tag"); throw HttpException(code, url) }
+                val body = c.inputStream.use { String(it.readBytes(), charset) }
+                android.util.Log.i("TimingNet", "$code ${System.currentTimeMillis() - t0}ms ${body.length}c $tag")
+                body
+            } catch (e: Exception) {
+                if (e !is HttpException) android.util.Log.w("TimingNet", "ERR ${System.currentTimeMillis() - t0}ms $tag ${e.javaClass.simpleName}: ${e.message}")
+                throw e
             } finally {
                 c.disconnect()
             }

@@ -1,5 +1,6 @@
 package app.reviewnotes.timing
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -55,6 +56,8 @@ import app.reviewnotes.timing.ui.theme.Ink
 
 class MainActivity : ComponentActivity() {
     private val vm: AppViewModel by viewModels()
+    /** Launch extras (tab, open, close) so a test script can drive the screens. */
+    private val cmd = kotlinx.coroutines.flow.MutableStateFlow<Intent?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -63,8 +66,11 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
         )
-        setContent { AppRoot(vm) }
+        cmd.value = intent
+        setContent { AppRoot(vm, cmd) }
     }
+
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); cmd.value = intent }
 
     override fun onStart() { super.onStart(); vm.start() }
     override fun onStop() { vm.stop(); super.onStop() }
@@ -93,9 +99,16 @@ private val TABS = listOf("大势", "选股", "自选")
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun AppRoot(vm: AppViewModel) {
+fun AppRoot(vm: AppViewModel, cmd: kotlinx.coroutines.flow.StateFlow<Intent?>) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    val command by cmd.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(command) {
+        val c = command ?: return@LaunchedEffect
+        c.getIntExtra("tab", -1).takeIf { it in 0..2 }?.let { tab = it }
+        if (c.getBooleanExtra("close", false)) vm.closeDetail()
+        c.getStringExtra("open")?.let { id -> vm.openDetail(id, id.drop(2), "") }
+    }
     val lens = remember { LensState() }
     // list positions survive opening and closing a stock
     val homeList = rememberLazyListState(); val scanList = rememberLazyListState(); val watchList = rememberLazyListState()

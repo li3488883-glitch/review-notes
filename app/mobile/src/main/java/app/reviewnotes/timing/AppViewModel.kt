@@ -109,11 +109,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(refreshing = true) }
         val errs = mutableListOf<String>()
         try {
-            try { val m = withContext(Dispatchers.Default) { repo.market() }; _ui.update { it.copy(market = m, marketError = null) } } catch (e: Exception) { errs += "大势"; _ui.update { it.copy(marketError = e.message ?: "没拉到") } }
-            try { withContext(Dispatchers.Default) { refreshWatch() } } catch (e: Exception) { errs += "自选" }
+            try { val m = withContext(Dispatchers.Default) { repo.market() }; _ui.update { it.copy(market = m, marketError = null) } } catch (e: Exception) { android.util.Log.w("Timing", "market", e); errs += "大势"; _ui.update { it.copy(marketError = e.message ?: "没拉到") } }
+            try { withContext(Dispatchers.Default) { refreshWatch() } } catch (e: Exception) { android.util.Log.w("Timing", "watch", e); errs += "自选" }
             if (full || System.currentTimeMillis() - lastScan > 28_000) {
                 try { val s = withContext(Dispatchers.Default) { repo.scan() }; lastScan = System.currentTimeMillis(); _ui.update { it.copy(scan = s, scanError = null) } }
-                catch (e: Exception) { errs += "选股"; _ui.update { it.copy(scanError = e.message ?: "没拉到") } }
+                catch (e: Exception) { android.util.Log.w("Timing", "scan", e); errs += "选股"; _ui.update { it.copy(scanError = e.message ?: "没拉到") } }
             }
             _ui.value.detail?.let { d -> runCatching { withContext(Dispatchers.Default) { loadDetail(d.id, d.code, d.name, quiet = true) } } }
         } finally {
